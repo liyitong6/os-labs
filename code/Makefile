@@ -9,9 +9,7 @@ V       := @
 GCCPREFIX := riscv64-unknown-elf-
 #endif
 
-ifndef QEMU
 QEMU := qemu-system-riscv64
-endif
 
 
 # eliminate default suffix rules
@@ -163,14 +161,14 @@ qemu: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
 		-machine virt \
 		-nographic \
 		-bios default \
-		-device loader,file=$(UCOREIMG),addr=0x80200000
+		-kernel $(UCOREIMG)
 
 debug: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
 	$(V)$(QEMU) \
 		-machine virt \
 		-nographic \
 		-bios default \
-		-device loader,file=$(UCOREIMG),addr=0x80200000\
+		-kernel $(UCOREIMG)\
 		-s -S
 
 gdb:
