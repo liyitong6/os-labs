@@ -1,5 +1,8 @@
 #include <default_pmm.h>
 #include <best_fit_pmm.h>
+#ifdef USE_BUDDY_PMM
+#include <buddy_pmm.h>
+#endif
 #include <defs.h>
 #include <error.h>
 #include <memlayout.h>
@@ -10,6 +13,9 @@
 #include <string.h>
 #include <riscv.h>
 #include <dtb.h>
+#ifdef BUDDY_TEST
+#include <buddy_test.h>
+#endif
 
 // virtual address of physical page array
 struct Page *pages;
@@ -34,7 +40,12 @@ static void check_alloc_page(void);
 
 // init_pmm_manager - initialize a pmm_manager instance
 static void init_pmm_manager(void) {
+    // lab2 2413646: retain the default manager unless Buddy is selected.
+#ifdef USE_BUDDY_PMM
+    pmm_manager = &buddy_pmm_manager;
+#else
     pmm_manager = &default_pmm_manager;
+#endif
     cprintf("memory management: %s\n", pmm_manager->name);
     pmm_manager->init();
 }
@@ -107,7 +118,12 @@ static void page_init(void) {
         list_init(&pages[i].page_link);
     }
 
+    // lab2 2413646: test-only registration uses the same real available RAM.
+#ifdef BUDDY_TEST
+    buddy_test_init_memmap(pa2page(free_start), (free_end - free_start) / PGSIZE);
+#else
     init_memmap(pa2page(free_start), (free_end - free_start) / PGSIZE);
+#endif
 
     cprintf("Physical memory: [0x%016lx, 0x%016lx)\n",
             (unsigned long)mem_base, (unsigned long)mem_end);
@@ -137,6 +153,11 @@ void pmm_init(void) {
 }
 
 static void check_alloc_page(void) {
+    // lab2 2413646: no test callback is different from a successful check.
+    if (pmm_manager->check == NULL) {
+        cprintf("PMM check skipped: no check callback installed.\n");
+        return;
+    }
     pmm_manager->check();
     cprintf("check_alloc_page() succeeded!\n");
 }

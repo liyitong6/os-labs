@@ -5,6 +5,11 @@ SLASH	:= /
 
 V       := @
 
+# lab2 2413646: explicitly select Buddy; keep the existing default choice.
+PMM     ?= default
+BUDDY_TEST ?= 0
+BUDDY_CASE ?= 0
+
 #ifndef GCCPREFIX
 GCCPREFIX := riscv64-unknown-elf-
 #endif
@@ -109,10 +114,22 @@ KSRCDIR		+= kern/init \
 
 KCFLAGS		+= $(addprefix -I,$(KINCLUDE))
 
+# lab2 2413646: only Buddy builds exclude the unfinished Best-Fit source.
+KERNEL_SOURCES := $(filter-out kern/mm/buddy_test.c,$(call listf_cc,$(KSRCDIR)))
+ifeq ($(PMM),buddy)
+KCFLAGS += -DUSE_BUDDY_PMM
+KERNEL_SOURCES := $(filter-out kern/mm/best_fit_pmm.c,$(KERNEL_SOURCES))
+# lab2 2413646: tests are opt-in and do not alter ordinary Buddy builds.
+ifeq ($(BUDDY_TEST),1)
+KCFLAGS += -DBUDDY_TEST -DBUDDY_TEST_CASE=$(BUDDY_CASE)
+KERNEL_SOURCES += kern/mm/buddy_test.c
+endif
+endif
+
 ifeq ($(MAKECMDGOALS),test)
-$(call add_files_cc2,$(call listf_cc,$(KSRCDIR)),kernel,$(KCFLAGS))
+$(call add_files_cc2,$(KERNEL_SOURCES),kernel,$(KCFLAGS))
 else
-$(call add_files_cc,$(call listf_cc,$(KSRCDIR)),kernel,$(KCFLAGS))
+$(call add_files_cc,$(KERNEL_SOURCES),kernel,$(KCFLAGS))
 endif
 KOBJS	= $(call read_packet,kernel libs)
 
