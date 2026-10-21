@@ -2,7 +2,6 @@
 
 ## 记录说明
 
-成员使用信息按本人提供统一记录为 ChatGPT / 6.1 Sol。李易桐的两条 Prompt 是对话中确认的整理版；洪若曦和秦紫轩部分来自此次上传的原始 Markdown，Buddy 记录还包含阶段性 AI 输出。总文件保留内容并调整了标题层级和本机文件链接以便在本包阅读；未经改写的原件另存于 `materials/originals/`。原文中的阶段性完成结论应结合最终源码与本报告的验证范围理解。
 
 - [整合报告](report.md)
 - [洪若曦原始 Prompt](materials/originals/best-fit/prompt.md)
@@ -15,7 +14,7 @@
 
 [PROMPT]
 
-我负责 riscv64-ucore Lab2 功能模块一，姓名李易桐，学号2412933。请根据当前工程接口，协助实现 `kern/mm/pmm.c` 中的 `static void page_init(void)`。
+我负责 riscv64-ucore Lab2 功能模块一，请根据当前工程接口，协助实现 `kern/mm/pmm.c` 中的 `static void page_init(void)`。
 
 [RELY]
 
