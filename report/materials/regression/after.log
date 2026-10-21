@@ -1,0 +1,6 @@
+PASS adjacent-release: free_before=2, alloc_2=expected block, free_after=0
+PASS registration-links: separate registered ranges: links=valid, free=2
+PASS best-fit-choice: smallest adequate block: correct
+PASS original-self-check: original basic_check and best_fit_check returned
+HOST REGRESSION: 4/4 passed
+Scope: real Best-Fit and list code with host stubs; not a QEMU/grade result.

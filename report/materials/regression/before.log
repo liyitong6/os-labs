@@ -1,0 +1,6 @@
+FAIL adjacent-release: free_before=2, alloc_2=NULL, free_after=2
+FAIL registration-links: separate registered ranges: links=broken, free=2
+FAIL best-fit-choice: smallest adequate block: incorrect
+PASS original-self-check: original basic_check and best_fit_check returned
+HOST REGRESSION: 1/4 passed
+Scope: real Best-Fit and list code with host stubs; not a QEMU/grade result.

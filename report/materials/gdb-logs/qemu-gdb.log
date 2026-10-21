@@ -1,0 +1,760 @@
+Signal        Stop	Print	Pass to program	Description
+SIGPIPE       No	No	Yes		Broken pipe
+Breakpoint 1 at 0x4ba080: file ../target/riscv/cpu_helper.c, line 1184.
+Starting program: /opt/qemu/bin/qemu-system-riscv64 -machine virt -m 128M -display none -monitor none -serial file:../report/materials/gdb-logs/qemu-console.log -bios default -kernel bin/ucore.img
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+[New Thread 0x7ffff75ff640 (LWP 718)]
+[New Thread 0x7ffff6ac8640 (LWP 719)]
+[Switching to Thread 0x7ffff6ac8640 (LWP 719)]
+
+Thread 3 "qemu-system-ris" hit Breakpoint 1, riscv_cpu_tlb_fill (cs=0x5555566d9cf0, address=18446744072637907158, size=0, access_type=MMU_INST_FETCH, mmu_idx=1, probe=false, retaddr=0) at ../target/riscv/cpu_helper.c:1184
+1184	{
+$1 = 0xffffffffc02000d6
+$2 = MMU_INST_FETCH
+#0  riscv_cpu_tlb_fill (cs=0x5555566d9cf0, address=18446744072637907158, size=0, access_type=MMU_INST_FETCH, mmu_idx=1, probe=false, retaddr=0) at ../target/riscv/cpu_helper.c:1184
+#1  0x0000555555b6a399 in tlb_fill (cpu=0x5555566d9cf0, addr=18446744072637907158, size=0, access_type=MMU_INST_FETCH, mmu_idx=1, retaddr=0) at ../accel/tcg/cputlb.c:1313
+#2  0x0000555555b6f9b5 in get_page_addr_code_hostp (env=0x5555566e2e70, addr=addr@entry=18446744072637907158, hostp=hostp@entry=0x0) at /home/liyitong/qemu-7.0.0/include/exec/cpu-all.h:467
+#3  0x0000555555b6fa2b in get_page_addr_code (env=<optimized out>, addr=addr@entry=18446744072637907158) at ../accel/tcg/cputlb.c:1549
+#4  0x0000555555b60048 in tb_htable_lookup (cpu=cpu@entry=0x5555566d9cf0, pc=18446744072637907158, cs_base=<optimized out>, flags=2158593, cflags=4278190080) at ../accel/tcg/cpu-exec.c:541
+#5  0x0000555555b60673 in tb_lookup (cflags=<optimized out>, flags=<optimized out>, cs_base=<optimized out>, pc=<optimized out>, cpu=0x5555566d9cf0) at ../accel/tcg/cpu-exec.c:196
+(More stack frames follow...)
+Temporary breakpoint 2 at 0x555555a0ca90: file ../target/riscv/cpu_helper.c, line 750.
+Continuing.
+
+Thread 3 "qemu-system-ris" hit Temporary breakpoint 2, get_physical_address (env=env@entry=0x5555566e2e70, physical=physical@entry=0x7ffff6ac7108, prot=prot@entry=0x7ffff6ac70fc, addr=addr@entry=18446744072637907158, fault_pte_addr=fault_pte_addr@entry=0x0, access_type=access_type@entry=2, mmu_idx=1, first_stage=true, two_stage=false, is_debug=false) at ../target/riscv/cpu_helper.c:750
+750	{
+$3 = 0xffffffffc02000d6
+$4 = 0x8000000000080205
+744	static int get_physical_address(CPURISCVState *env, hwaddr *physical,
+745	                                int *prot, target_ulong addr,
+746	                                target_ulong *fault_pte_addr,
+747	                                int access_type, int mmu_idx,
+748	                                bool first_stage, bool two_stage,
+749	                                bool is_debug)
+750	{
+751	    /* NOTE: the env->pc value visible here will not be
+752	     * correct, but the value visible to the exception handler
+753	     * (riscv_cpu_do_interrupt) is correct */
+754	    MemTxResult res;
+755	    MemTxAttrs attrs = MEMTXATTRS_UNSPECIFIED;
+756	    int mode = mmu_idx & TB_FLAGS_PRIV_MMU_MASK;
+757	    bool use_background = false;
+758	    hwaddr ppn;
+759	    RISCVCPU *cpu = env_archcpu(env);
+760	    int napot_bits = 0;
+761	    target_ulong napot_mask;
+762	
+763	    /*
+764	     * Check if we should use the background registers for the two
+765	     * stage translation. We don't need to check if we actually need
+766	     * two stage translation as that happened before this function
+767	     * was called. Background registers will be used if the guest has
+768	     * forced a two stage translation to be on (in HS or M mode).
+769	     */
+770	    if (!riscv_cpu_virt_enabled(env) && two_stage) {
+771	        use_background = true;
+772	    }
+773	
+774	    /* MPRV does not affect the virtual-machine load/store
+775	       instructions, HLV, HLVX, and HSV. */
+776	    if (riscv_cpu_two_stage_lookup(mmu_idx)) {
+777	        mode = get_field(env->hstatus, HSTATUS_SPVP);
+778	    } else if (mode == PRV_M && access_type != MMU_INST_FETCH) {
+779	        if (get_field(env->mstatus, MSTATUS_MPRV)) {
+780	            mode = get_field(env->mstatus, MSTATUS_MPP);
+781	        }
+782	    }
+783	
+784	    if (first_stage == false) {
+785	        /* We are in stage 2 translation, this is similar to stage 1. */
+786	        /* Stage 2 is always taken as U-mode */
+787	        mode = PRV_U;
+788	    }
+789	
+790	    if (mode == PRV_M || !riscv_feature(env, RISCV_FEATURE_MMU)) {
+791	        *physical = addr;
+792	        *prot = PAGE_READ | PAGE_WRITE | PAGE_EXEC;
+793	        return TRANSLATE_SUCCESS;
+794	    }
+795	
+796	    *prot = 0;
+797	
+798	    hwaddr base;
+799	    int levels, ptidxbits, ptesize, vm, sum, mxr, widened;
+800	
+801	    if (first_stage == true) {
+802	        mxr = get_field(env->mstatus, MSTATUS_MXR);
+803	    } else {
+804	        mxr = get_field(env->vsstatus, MSTATUS_MXR);
+805	    }
+806	
+807	    if (first_stage == true) {
+808	        if (use_background) {
+809	            if (riscv_cpu_mxl(env) == MXL_RV32) {
+810	                base = (hwaddr)get_field(env->vsatp, SATP32_PPN) << PGSHIFT;
+811	                vm = get_field(env->vsatp, SATP32_MODE);
+812	            } else {
+813	                base = (hwaddr)get_field(env->vsatp, SATP64_PPN) << PGSHIFT;
+814	                vm = get_field(env->vsatp, SATP64_MODE);
+815	            }
+816	        } else {
+817	            if (riscv_cpu_mxl(env) == MXL_RV32) {
+818	                base = (hwaddr)get_field(env->satp, SATP32_PPN) << PGSHIFT;
+819	                vm = get_field(env->satp, SATP32_MODE);
+820	            } else {
+821	                base = (hwaddr)get_field(env->satp, SATP64_PPN) << PGSHIFT;
+822	                vm = get_field(env->satp, SATP64_MODE);
+823	            }
+824	        }
+825	        widened = 0;
+826	    } else {
+827	        if (riscv_cpu_mxl(env) == MXL_RV32) {
+828	            base = (hwaddr)get_field(env->hgatp, SATP32_PPN) << PGSHIFT;
+829	            vm = get_field(env->hgatp, SATP32_MODE);
+830	        } else {
+0x0000555555a0e26e in riscv_cpu_tlb_fill (cs=0x5555566d9cf0, address=18446744072637907158, size=0, access_type=MMU_INST_FETCH, mmu_idx=1, probe=<optimized out>, retaddr=0) at ../target/riscv/cpu_helper.c:1281
+1281	        qemu_log_mask(CPU_LOG_MMU,
+$5 = <optimized out>
+No symbol "first_stage" in current context.
+No symbol "base" in current context.
+No symbol "vm" in current context.
+831	            base = (hwaddr)get_field(env->hgatp, SATP64_PPN) << PGSHIFT;
+832	            vm = get_field(env->hgatp, SATP64_MODE);
+833	        }
+834	        widened = 2;
+835	    }
+836	    /* status.SUM will be ignored if execute on background */
+837	    sum = get_field(env->mstatus, MSTATUS_SUM) || use_background || is_debug;
+838	    switch (vm) {
+839	    case VM_1_10_SV32:
+840	      levels = 2; ptidxbits = 10; ptesize = 4; break;
+841	    case VM_1_10_SV39:
+842	      levels = 3; ptidxbits = 9; ptesize = 8; break;
+843	    case VM_1_10_SV48:
+844	      levels = 4; ptidxbits = 9; ptesize = 8; break;
+845	    case VM_1_10_SV57:
+846	      levels = 5; ptidxbits = 9; ptesize = 8; break;
+847	    case VM_1_10_MBARE:
+848	        *physical = addr;
+849	        *prot = PAGE_READ | PAGE_WRITE | PAGE_EXEC;
+850	        return TRANSLATE_SUCCESS;
+851	    default:
+852	      g_assert_not_reached();
+853	    }
+854	
+855	    CPUState *cs = env_cpu(env);
+856	    int va_bits = PGSHIFT + levels * ptidxbits + widened;
+857	    target_ulong mask, masked_msbs;
+858	
+859	    if (TARGET_LONG_BITS > (va_bits - 1)) {
+860	        mask = (1L << (TARGET_LONG_BITS - (va_bits - 1))) - 1;
+861	    } else {
+862	        mask = 0;
+863	    }
+864	    masked_msbs = (addr >> (va_bits - 1)) & mask;
+865	
+866	    if (masked_msbs != 0 && masked_msbs != mask) {
+867	        return TRANSLATE_FAIL;
+868	    }
+869	
+870	    int ptshift = (levels - 1) * ptidxbits;
+871	    int i;
+872	
+873	#if !TCG_OVERSIZED_GUEST
+874	restart:
+875	#endif
+876	    for (i = 0; i < levels; i++, ptshift -= ptidxbits) {
+877	        target_ulong idx;
+878	        if (i == 0) {
+879	            idx = (addr >> (PGSHIFT + ptshift)) &
+880	                           ((1 << (ptidxbits + widened)) - 1);
+881	        } else {
+882	            idx = (addr >> (PGSHIFT + ptshift)) &
+883	                           ((1 << ptidxbits) - 1);
+884	        }
+885	
+886	        /* check that physical address of PTE is legal */
+887	        hwaddr pte_addr;
+888	
+889	        if (two_stage && first_stage) {
+890	            int vbase_prot;
+891	            hwaddr vbase;
+892	
+893	            /* Do the second stage translation on the base PTE address. */
+894	            int vbase_ret = get_physical_address(env, &vbase, &vbase_prot,
+895	                                                 base, NULL, MMU_DATA_LOAD,
+896	                                                 mmu_idx, false, true,
+897	                                                 is_debug);
+898	
+899	            if (vbase_ret != TRANSLATE_SUCCESS) {
+900	                if (fault_pte_addr) {
+901	                    *fault_pte_addr = (base + idx * ptesize) >> 2;
+902	                }
+903	                return TRANSLATE_G_STAGE_FAIL;
+904	            }
+905	
+906	            pte_addr = vbase + idx * ptesize;
+907	        } else {
+908	            pte_addr = base + idx * ptesize;
+909	        }
+910	
+911	        int pmp_prot;
+912	        int pmp_ret = get_physical_address_pmp(env, &pmp_prot, NULL, pte_addr,
+913	                                               sizeof(target_ulong),
+914	                                               MMU_DATA_LOAD, PRV_S);
+915	        if (pmp_ret != TRANSLATE_SUCCESS) {
+916	            return TRANSLATE_PMP_FAIL;
+917	        }
+918	
+919	        target_ulong pte;
+920	        if (riscv_cpu_mxl(env) == MXL_RV32) {
+921	            pte = address_space_ldl(cs->as, pte_addr, attrs, &res);
+922	        } else {
+923	            pte = address_space_ldq(cs->as, pte_addr, attrs, &res);
+924	        }
+925	
+926	        if (res != MEMTX_OK) {
+927	            return TRANSLATE_FAIL;
+928	        }
+929	
+930	        if (riscv_cpu_sxl(env) == MXL_RV32) {
+Breakpoint 3 at 0x555555a0ced0: file ../target/riscv/cpu_helper.c, line 923.
+Starting program: /opt/qemu/bin/qemu-system-riscv64 -machine virt -m 128M -display none -monitor none -serial file:../report/materials/gdb-logs/qemu-console.log -bios default -kernel bin/ucore.img
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+[New Thread 0x7ffff75ff640 (LWP 1321)]
+[New Thread 0x7ffff6ac8640 (LWP 1322)]
+[Switching to Thread 0x7ffff6ac8640 (LWP 1322)]
+
+Thread 3 "qemu-system-ris" hit Breakpoint 3, get_physical_address (env=env@entry=0x5555566e2e70, physical=physical@entry=0x7ffff6ac7108, prot=prot@entry=0x7ffff6ac70fc, addr=addr@entry=18446744072637907158, fault_pte_addr=fault_pte_addr@entry=0x0, access_type=access_type@entry=2, mmu_idx=1, first_stage=true, two_stage=false, is_debug=false) at ../target/riscv/cpu_helper.c:923
+923	            pte = address_space_ldq(cs->as, pte_addr, attrs, &res);
+$6 = 0xffffffffc02000d6
+$7 = 0x80205000
+$8 = 0x1ff
+$9 = 0x80205ff8
+926	        if (res != MEMTX_OK) {
+$10 = 0x200000cf
+$11 = 0
+930	        if (riscv_cpu_sxl(env) == MXL_RV32) {
+931	            ppn = pte >> PTE_PPN_SHIFT;
+932	        } else if (cpu->cfg.ext_svpbmt || cpu->cfg.ext_svnapot) {
+933	            ppn = (pte & (target_ulong)PTE_PPN_MASK) >> PTE_PPN_SHIFT;
+934	        } else {
+935	            ppn = pte >> PTE_PPN_SHIFT;
+936	            if ((pte & ~(target_ulong)PTE_PPN_MASK) >> PTE_PPN_SHIFT) {
+937	                return TRANSLATE_FAIL;
+938	            }
+939	        }
+940	
+941	        if (!(pte & PTE_V)) {
+942	            /* Invalid PTE */
+943	            return TRANSLATE_FAIL;
+944	        } else if (!cpu->cfg.ext_svpbmt && (pte & PTE_PBMT)) {
+945	            return TRANSLATE_FAIL;
+946	        } else if (!(pte & (PTE_R | PTE_W | PTE_X))) {
+947	            /* Inner PTE, continue walking */
+948	            if (pte & (PTE_D | PTE_A | PTE_U | PTE_ATTR)) {
+949	                return TRANSLATE_FAIL;
+950	            }
+951	            base = ppn << PGSHIFT;
+952	        } else if ((pte & (PTE_R | PTE_W | PTE_X)) == PTE_W) {
+953	            /* Reserved leaf PTE flags: PTE_W */
+954	            return TRANSLATE_FAIL;
+955	        } else if ((pte & (PTE_R | PTE_W | PTE_X)) == (PTE_W | PTE_X)) {
+956	            /* Reserved leaf PTE flags: PTE_W + PTE_X */
+957	            return TRANSLATE_FAIL;
+958	        } else if ((pte & PTE_U) && ((mode != PRV_U) &&
+959	                   (!sum || access_type == MMU_INST_FETCH))) {
+960	            /* User PTE flags when not U mode and mstatus.SUM is not set,
+961	               or the access type is an instruction fetch */
+962	            return TRANSLATE_FAIL;
+963	        } else if (!(pte & PTE_U) && (mode != PRV_S)) {
+964	            /* Supervisor PTE flags when not S mode */
+965	            return TRANSLATE_FAIL;
+966	        } else if (ppn & ((1ULL << ptshift) - 1)) {
+967	            /* Misaligned PPN */
+968	            return TRANSLATE_FAIL;
+969	        } else if (access_type == MMU_DATA_LOAD && !((pte & PTE_R) ||
+970	                   ((pte & PTE_X) && mxr))) {
+971	            /* Read access check failed */
+972	            return TRANSLATE_FAIL;
+973	        } else if (access_type == MMU_DATA_STORE && !(pte & PTE_W)) {
+974	            /* Write access check failed */
+975	            return TRANSLATE_FAIL;
+976	        } else if (access_type == MMU_INST_FETCH && !(pte & PTE_X)) {
+977	            /* Fetch access check failed */
+978	            return TRANSLATE_FAIL;
+979	        } else {
+980	            /* if necessary, set accessed and dirty bits. */
+981	            target_ulong updated_pte = pte | PTE_A |
+982	                (access_type == MMU_DATA_STORE ? PTE_D : 0);
+983	
+984	            /* Page table updates need to be atomic with MTTCG enabled */
+985	            if (updated_pte != pte) {
+986	                /*
+987	                 * - if accessed or dirty bits need updating, and the PTE is
+988	                 *   in RAM, then we do so atomically with a compare and swap.
+989	                 * - if the PTE is in IO space or ROM, then it can't be updated
+990	                 *   and we return TRANSLATE_FAIL.
+991	                 * - if the PTE changed by the time we went to update it, then
+992	                 *   it is no longer valid and we must re-walk the page table.
+993	                 */
+994	                MemoryRegion *mr;
+995	                hwaddr l = sizeof(target_ulong), addr1;
+996	                mr = address_space_translate(cs->as, pte_addr,
+997	                    &addr1, &l, false, MEMTXATTRS_UNSPECIFIED);
+998	                if (memory_region_is_ram(mr)) {
+999	                    target_ulong *pte_pa =
+1000	                        qemu_map_ram_ptr(mr->ram_block, addr1);
+1001	#if TCG_OVERSIZED_GUEST
+1002	                    /* MTTCG is not enabled on oversized TCG guests so
+1003	                     * page table updates do not need to be atomic */
+1004	                    *pte_pa = pte = updated_pte;
+1005	#else
+1006	                    target_ulong old_pte =
+1007	                        qatomic_cmpxchg(pte_pa, pte, updated_pte);
+1008	                    if (old_pte != pte) {
+1009	                        goto restart;
+1010	                    } else {
+Run till exit from #0  get_physical_address (env=env@entry=0x5555566e2e70, physical=physical@entry=0x7ffff6ac7108, prot=prot@entry=0x7ffff6ac70fc, addr=addr@entry=18446744072637907158, fault_pte_addr=fault_pte_addr@entry=0x0, access_type=access_type@entry=2, mmu_idx=1, first_stage=true, two_stage=false, is_debug=false) at ../target/riscv/cpu_helper.c:926
+0x0000555555a0e26e in riscv_cpu_tlb_fill (cs=0x5555566d9cf0, address=18446744072637907158, size=0, access_type=MMU_INST_FETCH, mmu_idx=1, probe=<optimized out>, retaddr=0) at ../target/riscv/cpu_helper.c:1281
+1281	        qemu_log_mask(CPU_LOG_MMU,
+Value returned is $12 = 0
+$13 = 0xffffffffc02000d6
+$14 = 0x802000d6
+$15 = 7
+1181	bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
+1182	                        MMUAccessType access_type, int mmu_idx,
+1183	                        bool probe, uintptr_t retaddr)
+1184	{
+1185	    RISCVCPU *cpu = RISCV_CPU(cs);
+1186	    CPURISCVState *env = &cpu->env;
+1187	    vaddr im_address;
+1188	    hwaddr pa = 0;
+1189	    int prot, prot2, prot_pmp;
+1190	    bool pmp_violation = false;
+1191	    bool first_stage_error = true;
+1192	    bool two_stage_lookup = false;
+1193	    int ret = TRANSLATE_FAIL;
+1194	    int mode = mmu_idx;
+1195	    /* default TLB page size */
+1196	    target_ulong tlb_size = TARGET_PAGE_SIZE;
+1197	
+1198	    env->guest_phys_fault_addr = 0;
+1199	
+1200	    qemu_log_mask(CPU_LOG_MMU, "%s ad %" VADDR_PRIx " rw %d mmu_idx %d\n",
+1201	                  __func__, address, access_type, mmu_idx);
+1202	
+1203	    /* MPRV does not affect the virtual-machine load/store
+1204	       instructions, HLV, HLVX, and HSV. */
+1205	    if (riscv_cpu_two_stage_lookup(mmu_idx)) {
+1206	        mode = get_field(env->hstatus, HSTATUS_SPVP);
+1207	    } else if (mode == PRV_M && access_type != MMU_INST_FETCH &&
+1208	               get_field(env->mstatus, MSTATUS_MPRV)) {
+1209	        mode = get_field(env->mstatus, MSTATUS_MPP);
+1210	        if (riscv_has_ext(env, RVH) && get_field(env->mstatus, MSTATUS_MPV)) {
+1211	            two_stage_lookup = true;
+1212	        }
+1213	    }
+1214	
+1215	    if (riscv_cpu_virt_enabled(env) ||
+1216	        ((riscv_cpu_two_stage_lookup(mmu_idx) || two_stage_lookup) &&
+1217	         access_type != MMU_INST_FETCH)) {
+1218	        /* Two stage lookup */
+1219	        ret = get_physical_address(env, &pa, &prot, address,
+1220	                                   &env->guest_phys_fault_addr, access_type,
+1221	                                   mmu_idx, true, true, false);
+1222	
+1223	        /*
+1224	         * A G-stage exception may be triggered during two state lookup.
+1225	         * And the env->guest_phys_fault_addr has already been set in
+1226	         * get_physical_address().
+1227	         */
+1228	        if (ret == TRANSLATE_G_STAGE_FAIL) {
+1229	            first_stage_error = false;
+1230	            access_type = MMU_DATA_LOAD;
+1231	        }
+1232	
+1233	        qemu_log_mask(CPU_LOG_MMU,
+1234	                      "%s 1st-stage address=%" VADDR_PRIx " ret %d physical "
+1235	                      TARGET_FMT_plx " prot %d\n",
+1236	                      __func__, address, ret, pa, prot);
+1237	
+1238	        if (ret == TRANSLATE_SUCCESS) {
+1239	            /* Second stage lookup */
+1240	            im_address = pa;
+1241	
+1242	            ret = get_physical_address(env, &pa, &prot2, im_address, NULL,
+1243	                                       access_type, mmu_idx, false, true,
+1244	                                       false);
+1245	
+1246	            qemu_log_mask(CPU_LOG_MMU,
+1247	                    "%s 2nd-stage address=%" VADDR_PRIx " ret %d physical "
+1248	                    TARGET_FMT_plx " prot %d\n",
+1249	                    __func__, im_address, ret, pa, prot2);
+1250	
+1251	            prot &= prot2;
+1252	
+1253	            if (ret == TRANSLATE_SUCCESS) {
+1254	                ret = get_physical_address_pmp(env, &prot_pmp, &tlb_size, pa,
+1255	                                               size, access_type, mode);
+1256	
+1257	                qemu_log_mask(CPU_LOG_MMU,
+1258	                              "%s PMP address=" TARGET_FMT_plx " ret %d prot"
+1259	                              " %d tlb_size " TARGET_FMT_lu "\n",
+1260	                              __func__, pa, ret, prot_pmp, tlb_size);
+1261	
+1262	                prot &= prot_pmp;
+1263	            }
+1264	
+1265	            if (ret != TRANSLATE_SUCCESS) {
+1266	                /*
+1267	                 * Guest physical address translation failed, this is a HS
+1268	                 * level exception
+1269	                 */
+1270	                first_stage_error = false;
+1271	                env->guest_phys_fault_addr = (im_address |
+1272	                                              (address &
+1273	                                               (TARGET_PAGE_SIZE - 1))) >> 2;
+1274	            }
+1275	        }
+1276	    } else {
+1277	        /* Single stage lookup */
+1278	        ret = get_physical_address(env, &pa, &prot, address, NULL,
+1279	                                   access_type, mmu_idx, true, false, false);
+1280	
+1281	        qemu_log_mask(CPU_LOG_MMU,
+1282	                      "%s address=%" VADDR_PRIx " ret %d physical "
+1283	                      TARGET_FMT_plx " prot %d\n",
+1284	                      __func__, address, ret, pa, prot);
+1285	
+1286	        if (ret == TRANSLATE_SUCCESS) {
+1287	            ret = get_physical_address_pmp(env, &prot_pmp, &tlb_size, pa,
+1288	                                           size, access_type, mode);
+1289	
+1290	            qemu_log_mask(CPU_LOG_MMU,
+1291	                          "%s PMP address=" TARGET_FMT_plx " ret %d prot"
+1292	                          " %d tlb_size " TARGET_FMT_lu "\n",
+1293	                          __func__, pa, ret, prot_pmp, tlb_size);
+1294	
+1295	            prot &= prot_pmp;
+1296	        }
+1297	    }
+1298	
+1299	    if (ret == TRANSLATE_PMP_FAIL) {
+1300	        pmp_violation = true;
+1301	    }
+1302	
+1303	    if (ret == TRANSLATE_SUCCESS) {
+1304	        tlb_set_page(cs, address & ~(tlb_size - 1), pa & ~(tlb_size - 1),
+1305	                     prot, mmu_idx, tlb_size);
+1306	        return true;
+1307	    } else if (probe) {
+1308	        return false;
+1309	    } else {
+1310	        raise_mmu_exception(env, address, access_type, pmp_violation,
+1311	                            first_stage_error,
+1312	                            riscv_cpu_virt_enabled(env) ||
+1313	                                riscv_cpu_two_stage_lookup(mmu_idx));
+1314	        riscv_raise_exception(env, cs->exception_index, retaddr);
+1315	    }
+1316	
+1317	    return true;
+1318	}
+1319	#endif /* !CONFIG_USER_ONLY */
+1320	
+1321	/*
+1322	 * Handle Traps
+1323	 *
+1324	 * Adapted from Spike's processor_t::take_trap.
+1325	 *
+1326	 */
+1327	void riscv_cpu_do_interrupt(CPUState *cs)
+1328	{
+1329	#if !defined(CONFIG_USER_ONLY)
+1330	
+1331	    RISCVCPU *cpu = RISCV_CPU(cs);
+1332	    CPURISCVState *env = &cpu->env;
+1333	    bool write_gva = false;
+1334	    uint64_t s;
+1335	
+1336	    /* cs->exception is 32-bits wide unlike mcause which is XLEN-bits wide
+1337	     * so we mask off the MSB and separate into trap type and cause.
+1338	     */
+1339	    bool async = !!(cs->exception_index & RISCV_EXCP_INT_FLAG);
+1340	    target_ulong cause = cs->exception_index & RISCV_EXCP_INT_MASK;
+1341	    uint64_t deleg = async ? env->mideleg : env->medeleg;
+1342	    target_ulong tval = 0;
+1343	    target_ulong htval = 0;
+1344	    target_ulong mtval2 = 0;
+1345	
+1346	    if  (cause == RISCV_EXCP_SEMIHOST) {
+1347	        if (env->priv >= PRV_S) {
+1348	            env->gpr[xA0] = do_common_semihosting(cs);
+1349	            env->pc += 4;
+1350	            return;
+Temporary breakpoint 4 at 0x555555a0e402: file ../target/riscv/cpu_helper.c, line 1304.
+Continuing.
+
+Thread 3 "qemu-system-ris" hit Temporary breakpoint 4, riscv_cpu_tlb_fill (cs=0x5555566d9cf0, address=18446744072637907158, size=<optimized out>, access_type=<optimized out>, mmu_idx=1, probe=<optimized out>, retaddr=0) at ../target/riscv/cpu_helper.c:1304
+1304	        tlb_set_page(cs, address & ~(tlb_size - 1), pa & ~(tlb_size - 1),
+$16 = <optimized out>
+$17 = 0xffffffffc02000d6
+$18 = 0x802000d6
+$19 = 7
+$20 = 1
+$21 = 0x1000
+tlb_set_page (cpu=cpu@entry=0x5555566d9cf0, vaddr=18446744072637906944, paddr=2149580800, prot=7, mmu_idx=mmu_idx@entry=1, size=4096) at ../accel/tcg/cputlb.c:1281
+1281	{
+#0  tlb_set_page (cpu=cpu@entry=0x5555566d9cf0, vaddr=18446744072637906944, paddr=2149580800, prot=7, mmu_idx=mmu_idx@entry=1, size=4096) at ../accel/tcg/cputlb.c:1281
+#1  0x0000555555a0e426 in riscv_cpu_tlb_fill (cs=0x5555566d9cf0, address=18446744072637907158, size=<optimized out>, access_type=<optimized out>, mmu_idx=1, probe=<optimized out>, retaddr=0) at ../target/riscv/cpu_helper.c:1304
+#2  0x0000555555b6a399 in tlb_fill (cpu=0x5555566d9cf0, addr=18446744072637907158, size=0, access_type=MMU_INST_FETCH, mmu_idx=1, retaddr=0) at ../accel/tcg/cputlb.c:1313
+#3  0x0000555555b6f9b5 in get_page_addr_code_hostp (env=0x5555566e2e70, addr=addr@entry=18446744072637907158, hostp=hostp@entry=0x0) at /home/liyitong/qemu-7.0.0/include/exec/cpu-all.h:467
+(More stack frames follow...)
+cpu = 0x5555566d9cf0
+vaddr = 18446744072637906944
+paddr = 2149580800
+prot = 7
+mmu_idx = 1
+size = 4096
+1276	 * transaction attributes to be used.
+1277	 */
+1278	void tlb_set_page(CPUState *cpu, target_ulong vaddr,
+1279	                  hwaddr paddr, int prot,
+1280	                  int mmu_idx, target_ulong size)
+1281	{
+1282	    tlb_set_page_with_attrs(cpu, vaddr, paddr, MEMTXATTRS_UNSPECIFIED,
+1283	                            prot, mmu_idx, size);
+1284	}
+1285	
+Temporary breakpoint 5 at 0x555555b6f2b0: file ../accel/tcg/cputlb.c, line 1108.
+Continuing.
+
+Thread 3 "qemu-system-ris" hit Temporary breakpoint 5, tlb_set_page_with_attrs (cpu=cpu@entry=0x5555566d9cf0, vaddr=18446744072637906944, paddr=2149580800, attrs=attrs@entry=..., prot=7, mmu_idx=mmu_idx@entry=1, size=4096) at ../accel/tcg/cputlb.c:1108
+1108	{
+cpu = 0x5555566d9cf0
+vaddr = 18446744072637906944
+paddr = 2149580800
+attrs = {unspecified = 1, secure = 0, user = 0, memory = 0, requester_id = 0, byte_swap = 0, target_tlb_bit0 = 0, target_tlb_bit1 = 0, target_tlb_bit2 = 0}
+prot = 7
+mmu_idx = 1
+size = 4096
+1108	{
+1109	    CPUArchState *env = cpu->env_ptr;
+1110	    CPUTLB *tlb = env_tlb(env);
+1111	    CPUTLBDesc *desc = &tlb->d[mmu_idx];
+1112	    MemoryRegionSection *section;
+1113	    unsigned int index;
+1114	    target_ulong address;
+1115	    target_ulong write_address;
+1116	    uintptr_t addend;
+1117	    CPUTLBEntry *te, tn;
+1118	    hwaddr iotlb, xlat, sz, paddr_page;
+1119	    target_ulong vaddr_page;
+1120	    int asidx = cpu_asidx_from_attrs(cpu, attrs);
+1121	    int wp_flags;
+1122	    bool is_ram, is_romd;
+1123	
+1124	    assert_cpu_is_self(cpu);
+1125	
+1126	    if (size <= TARGET_PAGE_SIZE) {
+1127	        sz = TARGET_PAGE_SIZE;
+1128	    } else {
+1129	        tlb_add_large_page(env, mmu_idx, vaddr, size);
+1130	        sz = size;
+1131	    }
+1132	    vaddr_page = vaddr & TARGET_PAGE_MASK;
+1133	    paddr_page = paddr & TARGET_PAGE_MASK;
+1134	
+1135	    section = address_space_translate_for_iotlb(cpu, asidx, paddr_page,
+1136	                                                &xlat, &sz, attrs, &prot);
+1137	    assert(sz >= TARGET_PAGE_SIZE);
+1138	
+1139	    tlb_debug("vaddr=" TARGET_FMT_lx " paddr=0x" TARGET_FMT_plx
+1140	              " prot=%x idx=%d\n",
+1141	              vaddr, paddr, prot, mmu_idx);
+1142	
+1143	    address = vaddr_page;
+1144	    if (size < TARGET_PAGE_SIZE) {
+1145	        /* Repeat the MMU check and TLB fill on every access.  */
+1146	        address |= TLB_INVALID_MASK;
+1147	    }
+1148	    if (attrs.byte_swap) {
+1149	        address |= TLB_BSWAP;
+1150	    }
+1151	
+1152	    is_ram = memory_region_is_ram(section->mr);
+1153	    is_romd = memory_region_is_romd(section->mr);
+1154	
+1155	    if (is_ram || is_romd) {
+1156	        /* RAM and ROMD both have associated host memory. */
+1157	        addend = (uintptr_t)memory_region_get_ram_ptr(section->mr) + xlat;
+1158	    } else {
+1159	        /* I/O does not; force the host address to NULL. */
+1160	        addend = 0;
+1161	    }
+1162	
+1163	    write_address = address;
+1164	    if (is_ram) {
+1165	        iotlb = memory_region_get_ram_addr(section->mr) + xlat;
+1166	        /*
+1167	         * Computing is_clean is expensive; avoid all that unless
+1168	         * the page is actually writable.
+1169	         */
+1170	        if (prot & PAGE_WRITE) {
+1171	            if (section->readonly) {
+1172	                write_address |= TLB_DISCARD_WRITE;
+1173	            } else if (cpu_physical_memory_is_clean(iotlb)) {
+1174	                write_address |= TLB_NOTDIRTY;
+1175	            }
+1176	        }
+1177	    } else {
+1178	        /* I/O or ROMD */
+1179	        iotlb = memory_region_section_get_iotlb(cpu, section) + xlat;
+1180	        /*
+1181	         * Writes to romd devices must go through MMIO to enable write.
+1182	         * Reads to romd devices go through the ram_ptr found above,
+1183	         * but of course reads to I/O must go through MMIO.
+1184	         */
+1185	        write_address |= TLB_MMIO;
+1186	        if (!is_romd) {
+1187	            address = write_address;
+1188	        }
+1189	    }
+1190	
+1191	    wp_flags = cpu_watchpoint_address_matches(cpu, vaddr_page,
+1192	                                              TARGET_PAGE_SIZE);
+1193	
+1194	    index = tlb_index(env, mmu_idx, vaddr_page);
+1195	    te = tlb_entry(env, mmu_idx, vaddr_page);
+1196	
+1197	    /*
+1198	     * Hold the TLB lock for the rest of the function. We could acquire/release
+1199	     * the lock several times in the function, but it is faster to amortize the
+1200	     * acquisition cost by acquiring it just once. Note that this leads to
+1201	     * a longer critical section, but this is not a concern since the TLB lock
+1202	     * is unlikely to be contended.
+1203	     */
+1204	    qemu_spin_lock(&tlb->c.lock);
+1205	
+1206	    /* Note that the tlb is no longer clean.  */
+1207	    tlb->c.dirty |= 1 << mmu_idx;
+1208	
+1209	    /* Make sure there's no cached translation for the new page.  */
+1210	    tlb_flush_vtlb_page_locked(env, mmu_idx, vaddr_page);
+1211	
+1212	    /*
+1213	     * Only evict the old entry to the victim tlb if it's for a
+1214	     * different page; otherwise just overwrite the stale data.
+1215	     */
+1216	    if (!tlb_hit_page_anyprot(te, vaddr_page) && !tlb_entry_is_empty(te)) {
+1217	        unsigned vidx = desc->vindex++ % CPU_VTLB_SIZE;
+1218	        CPUTLBEntry *tv = &desc->vtable[vidx];
+1219	
+1220	        /* Evict the old entry into the victim tlb.  */
+1221	        copy_tlb_helper_locked(tv, te);
+1222	        desc->viotlb[vidx] = desc->iotlb[index];
+1223	        tlb_n_used_entries_dec(env, mmu_idx);
+1224	    }
+1225	
+1226	    /* refill the tlb */
+1227	    /*
+1228	     * At this point iotlb contains a physical section number in the lower
+1229	     * TARGET_PAGE_BITS, and either
+1230	     *  + the ram_addr_t of the page base of the target RAM (RAM)
+1231	     *  + the offset within section->mr of the page base (I/O, ROMD)
+1232	     * We subtract the vaddr_page (which is page aligned and thus won't
+1233	     * disturb the low bits) to give an offset which can be added to the
+1234	     * (non-page-aligned) vaddr of the eventual memory access to get
+1235	     * the MemoryRegion offset for the access. Note that the vaddr we
+1236	     * subtract here is that of the page base, and not the same as the
+1237	     * vaddr we add back in io_readx()/io_writex()/get_page_addr_code().
+1238	     */
+1239	    desc->iotlb[index].addr = iotlb - vaddr_page;
+1240	    desc->iotlb[index].attrs = attrs;
+1241	
+1242	    /* Now calculate the new entry */
+1243	    tn.addend = addend - vaddr_page;
+1244	    if (prot & PAGE_READ) {
+1245	        tn.addr_read = address;
+1246	        if (wp_flags & BP_MEM_READ) {
+1247	            tn.addr_read |= TLB_WATCHPOINT;
+1248	        }
+1249	    } else {
+1250	        tn.addr_read = -1;
+1251	    }
+1252	
+1253	    if (prot & PAGE_EXEC) {
+1254	        tn.addr_code = address;
+1255	    } else {
+1256	        tn.addr_code = -1;
+1257	    }
+1258	
+1259	    tn.addr_write = -1;
+1260	    if (prot & PAGE_WRITE) {
+1261	        tn.addr_write = write_address;
+1262	        if (prot & PAGE_WRITE_INV) {
+1263	            tn.addr_write |= TLB_INVALID_MASK;
+1264	        }
+1265	        if (wp_flags & BP_MEM_WRITE) {
+1266	            tn.addr_write |= TLB_WATCHPOINT;
+1267	        }
+1268	    }
+1269	
+1270	    copy_tlb_helper_locked(te, &tn);
+1271	    tlb_n_used_entries_inc(env, mmu_idx);
+1272	    qemu_spin_unlock(&tlb->c.lock);
+1273	}
+1274	
+1275	/* Add a new TLB entry, but without specifying the memory
+1276	 * transaction attributes to be used.
+1277	 */
+1278	void tlb_set_page(CPUState *cpu, target_ulong vaddr,
+1279	                  hwaddr paddr, int prot,
+1280	                  int mmu_idx, target_ulong size)
+1281	{
+Temporary breakpoint 6 at 0x555555b6f5dc: file ../accel/tcg/cputlb.c, line 1270.
+Continuing.
+
+Thread 3 "qemu-system-ris" hit Temporary breakpoint 6, tlb_n_used_entries_inc (mmu_idx=<optimized out>, env=<optimized out>) at ../accel/tcg/cputlb.c:1008
+1008	    *d = *s;
+$22 = {<text gnu-indirect-function variable, no debug info>} 0x7ffff76a8220 <strchr_ifunc>
+No symbol "te" in current context.
+No symbol "tn" in current context.
+1271	    tlb_n_used_entries_inc(env, mmu_idx);
+Attempt to take contents of a non-pointer value.
+#0  tlb_set_page_with_attrs (cpu=cpu@entry=0x5555566d9cf0, vaddr=<optimized out>, paddr=<optimized out>, attrs=attrs@entry=..., prot=<optimized out>, mmu_idx=mmu_idx@entry=1, size=<optimized out>) at ../accel/tcg/cputlb.c:1271
+#1  0x0000555555b6f85a in tlb_set_page (cpu=cpu@entry=0x5555566d9cf0, vaddr=<optimized out>, paddr=<optimized out>, prot=<optimized out>, mmu_idx=mmu_idx@entry=1, size=<optimized out>) at ../accel/tcg/cputlb.c:1282
+#2  0x0000555555a0e426 in riscv_cpu_tlb_fill (cs=0x5555566d9cf0, address=18446744072637907158, size=<optimized out>, access_type=<optimized out>, mmu_idx=1, probe=<optimized out>, retaddr=0) at ../target/riscv/cpu_helper.c:1304
+#3  0x0000555555b6a399 in tlb_fill (cpu=0x5555566d9cf0, addr=18446744072637907158, size=0, access_type=MMU_INST_FETCH, mmu_idx=1, retaddr=0) at ../accel/tcg/cputlb.c:1313
+#4  0x0000555555b6f9b5 in get_page_addr_code_hostp (env=0x5555566e2e70, addr=addr@entry=18446744072637907158, hostp=hostp@entry=0x0) at /home/liyitong/qemu-7.0.0/include/exec/cpu-all.h:467
+(More stack frames follow...)
+#0  tlb_set_page_with_attrs (cpu=cpu@entry=0x5555566d9cf0, vaddr=<optimized out>, paddr=<optimized out>, attrs=attrs@entry=..., prot=<optimized out>, mmu_idx=mmu_idx@entry=1, size=<optimized out>) at ../accel/tcg/cputlb.c:1271
+1271	    tlb_n_used_entries_inc(env, mmu_idx);
+env = 0x5555566e2e70
+tlb = 0x5555566e2000
+desc = 0x5555566e21d8
+section = <optimized out>
+index = <optimized out>
+address = <optimized out>
+write_address = <optimized out>
+addend = <optimized out>
+te = 0x7fffa4053600
+tn = {{{addr_read = 18446744072637906944, addr_write = 18446744072637907968, addr_code = 18446744072637906944, addend = 140737138130944}, dummy = "\000\000 \300\377\377\377\377\000\004 \300\377\377\377\377\000\000 \300\377\377\377\377\000\000 \353\377\177\000"}}
+iotlb = <optimized out>
+xlat = 2097152
+sz = 4096
+paddr_page = <optimized out>
+vaddr_page = <optimized out>
+asidx = <optimized out>
+wp_flags = <optimized out>
+is_ram = <optimized out>
+is_romd = <optimized out>
+__func__ = <optimized out>
+__PRETTY_FUNCTION__ = "tlb_set_page_with_attrs"
+_g_boolean_var_ = <optimized out>
+#0  tlb_set_page_with_attrs (cpu=cpu@entry=0x5555566d9cf0, vaddr=<optimized out>, paddr=<optimized out>, attrs=attrs@entry=..., prot=<optimized out>, mmu_idx=mmu_idx@entry=1, size=<optimized out>) at ../accel/tcg/cputlb.c:1271
+1271	    tlb_n_used_entries_inc(env, mmu_idx);
+$23 = {{{addr_read = 0xffffffffc0200000, addr_write = 0xffffffffc0200400, addr_code = 0xffffffffc0200000, addend = 0x7fffeb200000}, dummy = {0x0, 0x0, 0x20, 0xc0, 0xff, 0xff, 0xff, 0xff, 0x0, 0x4, 0x20, 0xc0, 0xff, 0xff, 0xff, 0xff, 0x0, 0x0, 0x20, 0xc0, 0xff, 0xff, 0xff, 0xff, 0x0, 0x0, 0x20, 0xeb, 0xff, 0x7f, 0x0, 0x0}}}
+$24 = {{{addr_read = 0xffffffffc0200000, addr_write = 0xffffffffc0200400, addr_code = 0xffffffffc0200000, addend = 0x7fffeb200000}, dummy = {0x0, 0x0, 0x20, 0xc0, 0xff, 0xff, 0xff, 0xff, 0x0, 0x4, 0x20, 0xc0, 0xff, 0xff, 0xff, 0xff, 0x0, 0x0, 0x20, 0xc0, 0xff, 0xff, 0xff, 0xff, 0x0, 0x0, 0x20, 0xeb, 0xff, 0x7f, 0x0, 0x0}}}

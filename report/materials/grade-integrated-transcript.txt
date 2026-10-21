@@ -1,0 +1,12 @@
+来源：李易桐应用整合版后提供的真实终端文字，记录本次 WSL 复评分。
+本文件为会话文字转录；不是原始截图，也不是此整理环境执行评分的输出。
+原始 tee 日志保存在其仓库 report/materials/grade-final.log。
+
+liyitong@LiYiTong:~/oslab/os-labs$ cd ~/oslab/os-labs/code
+liyitong@LiYiTong:~/oslab/os-labs/code$ set -o pipefail
+liyitong@LiYiTong:~/oslab/os-labs/code$ make grade QEMU=qemu-system-riscv64 2>&1 | tee ../report/materials/grade-final.log
+lab2 injection complete
+gmake[1]: Entering directory '/tmp/lab2_grade' + cc kern/init/entry.S + cc kern/init/init.c + cc kern/libs/stdio.c + cc kern/debug/panic.c + cc kern/driver/console.c + cc kern/driver/dtb.c + cc kern/mm/best_fit_pmm.c + cc kern/mm/buddy_pmm.c + cc kern/mm/default_pmm.c + cc kern/mm/pmm.c + cc kern/test/test_lab2.c + cc libs/printfmt.c + cc libs/readline.c + cc libs/sbi.c + cc libs/string.c + ld bin/kernel riscv64-unknown-elf-objcopy bin/kernel --strip-all -O binary bin/ucore.img gmake[1]: Leaving directory '/tmp/lab2_grade'
+  -check page init:                          OK
+  -check best fit:                           OK
+Total Score: 20/20

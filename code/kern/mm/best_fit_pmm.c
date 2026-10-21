@@ -3,7 +3,7 @@
 #include <best_fit_pmm.h>
 #include <stdio.h>
 
-//lab2 function2-2 YOUR CODE
+//lab2 function2-2 2413524
 
 static free_area_t free_area;
 
@@ -39,6 +39,7 @@ best_fit_init_memmap(struct Page *base, size_t n) {
                 break;
             } else if (list_next(le) == &free_list) {
                 list_add(le, &(base->page_link));
+                break;
             }
         }
     }
@@ -101,6 +102,7 @@ best_fit_free_pages(struct Page *base, size_t n) {
                 break;
             } else if (list_next(le) == &free_list) {
                 list_add(le, &(base->page_link));
+                break;
             }
         }
     }
