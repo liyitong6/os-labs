@@ -11,7 +11,7 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-REPORT = ROOT.parent / 'report' / 'materials' / 'originals' / 'slub'
+REPORT = ROOT.parent / 'report' / 'materials' / 'slub-tests'
 LOGS = REPORT / 'slub_test_logs' / datetime.now(
     timezone(timedelta(hours=8))).strftime('run-%Y%m%d-%H%M%S')
 SKIP_PMM = '--with-pmm-check' not in sys.argv[1:]

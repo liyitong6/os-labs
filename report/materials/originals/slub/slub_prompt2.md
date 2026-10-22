@@ -6,7 +6,7 @@
 
 实现 `kern/mm/slub_test.c/.h` 和 `tools/run_slub_tests.py`，仅按需修改 Makefile、`kern/init/init.c` 的测试接入，以及 `kmalloc.h/.c` 和 `slub_pmm.c` 的可选字节层 `.check` 绑定。先读取真实实现，不修改分配算法、通用接口或底层页管理器来使测试通过。保留现有参数、Buddy 测试和其他成员的工作，使用 `lab2 2413646` 注释，不执行 Git 操作。
 
-输出要求：实际执行后，将 AI 完成说明和真实测试结论追加到本 Prompt 后的 “AI 输出”小节，包含结果文档与日志位置、失败或限制；未执行前不生成通过记录。
+输出要求：完成说明和真实测试结论，包含结果文档与日志位置、失败或限制；未执行前不生成通过记录。
 
 [RELY]
 
@@ -59,7 +59,7 @@ void slub_check(void);
 
 失败时保留证据并报告原因，不放宽断言或重置状态伪造通过；测试有误可据实修正。无需重复验证 Buddy 合并算法或原评分流程，不宣称本测试等于 `make grade` 通过。
 
-### AI 输出（执行结果记录）
+### AI 输出
 
 #### 完成内容
 
@@ -85,7 +85,7 @@ python3 tools/run_slub_tests.py
 
 #### 结果与限制
 
-[测试结果及有效性说明](report_slub.md)；原始构建、QEMU 日志和结果 JSON 位于 `slub_test_logs/run-20261022-111315/`，每次运行保留独立目录。
+[测试结果及有效性说明](../../slub-tests/report_slub.md)；原始构建、QEMU 日志和结果 JSON 位于 `slub_test_logs/run-20261022-111315/`，每次运行保留独立目录。
 
 这些结果支持已覆盖场景中的分配和释放行为正确，不构成所有大小、布局与执行序列的完整证明；未验证并发、越界写入拦截或地址复用后的旧指针识别，也未执行原 `make grade`。本次未进行 Git 提交。
 
@@ -107,7 +107,7 @@ python3 tools/run_slub_tests.py
 
 跳过时明确打印原因，不能输出底层测试通过；底层初始化和可用页面登记必须完整，SLUB 自检照常执行。跳过模式不启用依赖 Buddy 自检完成的专用登记钩子。核对默认页管理器下的 SLUB 正常、异常和关闭模式；保留通过 `--with-pmm-check` 显式开启底层自检的能力。跳过模式结束后只重建默认镜像，不启动它再次执行底层自检。不改 Git，不声称未经测量的加速比例。
 
-### AI 输出（底层自检开关执行记录）
+### AI 输出
 
 已增加 `PMM_CHECK=0/1`，Makefile 默认 `1` 保留原页分配器自检；`0` 仅跳过 `.check`，打印 `PMM check skipped: PMM_CHECK=0.`，页初始化与 SLUB 自检不变。跳过时不启用 Buddy 自检依赖的专用页面登记钩子。
 
@@ -117,7 +117,7 @@ python3 tools/run_slub_tests.py
 python3 tools/run_slub_tests.py --skip-pmm-check
 ```
 
-本轮 29 项结果全部通过：两种页分配器下的正常测试、24 次预期拒绝和关闭模式均通过；最后只重建默认镜像，没有在跳过模式中启动默认镜像执行底层自检。结果及日志见 [report_slub.md](report_slub.md) 和 `slub_test_logs/run-20261022-113834/`。
+本轮 29 项结果全部通过：两种页分配器下的正常测试、24 次预期拒绝和关闭模式均通过；最后只重建默认镜像，没有在跳过模式中启动默认镜像执行底层自检。结果及日志见 [report_slub.md](../../slub-tests/report_slub.md) 和 `slub_test_logs/run-20261022-113834/`。
 
 另行验证 `BUDDY_TEST=1 PMM_CHECK=0` 时真实页面完整登记、SLUB 6 组测试通过；恢复 `PMM_CHECK=1` 时 Buddy 7 组和 SLUB 6 组自检同时通过；非法值 `PMM_CHECK=2` 被构建规则拒绝。这组开关验证日志保存在 `slub_test_logs/switch-20261022-114022/`。
 
@@ -146,10 +146,10 @@ python3 tools/run_slub_tests.py --skip-pmm-check
 
 每项输出明确标识 SLUB；正常用例核对全部组完成，异常用例核对具体断言，超时不得算通过。默认模式每次启动均确认底层自检被跳过，不启动额外联合测试；不改分配算法、不操作 Git。
 
-### AI 输出（默认最简测试执行结果）
+### AI 输出
 
 已将默认模式改为仅使用 Best-Fit 提供页面，所有用例名称带 `slub`；默认 `PMM_CHECK=0`，不轮换 Buddy，不启动额外联合测试。保留 `--with-pmm-check`，仅开启同一默认底层的自检。
 
 实际执行 `python3 tools/run_slub_tests.py`，15 项结果全部通过：正常功能 6 组、12 类预期拒绝、关闭模式，以及默认镜像重建（不启动）。本轮耗时 0.67 分钟。核对全部 14 次测试启动日志，均为 `PMM=default`、`PMM_CHECK=0`，均有底层自检跳过标识，没有底层测试通过标识。
 
-日志保存在 `slub_test_logs/run-20261022-120233/`，当前结果见 [report_slub.md](report_slub.md)。本轮未重新运行 `--with-pmm-check` 模式；未修改分配算法，未执行 Git 操作。
+日志保存在 `slub_test_logs/run-20261022-120233/`，当前结果见 [report_slub.md](../../slub-tests/report_slub.md)。本轮未重新运行 `--with-pmm-check` 模式；未修改分配算法，未执行 Git 操作。

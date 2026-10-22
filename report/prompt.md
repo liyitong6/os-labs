@@ -2,11 +2,15 @@
 
 ## 记录说明
 
+本文件汇总物理内存初始化、First-Fit 分析与 Best-Fit 实现、Buddy System 和 SLUB 的 Prompt。SLUB 部分包含三个实现小模块、测试生成及测试模式调整的 Prompt 和对应 AI 输出，见第四部分；同步后的验证结果一并保留。
 
-- [整合报告](report.md)
-- [洪若曦原始 Prompt](materials/originals/best-fit/prompt.md)
-- [秦紫轩实现原始记录](materials/originals/buddy/buddy_prompt1.md)
-- [秦紫轩测试原始记录](materials/originals/buddy/buddy_prompt2.md)
+[整合报告](report.md)；各成员的原始材料如下：
+
+- [洪若曦：Best-Fit 原始 Prompt](materials/originals/best-fit/prompt.md)
+- [秦紫轩：Buddy 实现 Prompt 与 AI 输出](materials/originals/buddy/buddy_prompt1.md)
+- [秦紫轩：Buddy 测试 Prompt 与 AI 输出](materials/originals/buddy/buddy_prompt2.md)
+- [秦紫轩：SLUB 实现 Prompt 与 AI 输出](materials/originals/slub/slub_prompt1.md)
+- [秦紫轩：SLUB 测试 Prompt 与 AI 输出](materials/originals/slub/slub_prompt2.md)
 
 ## 一、李易桐（2412933）：功能模块一
 
@@ -1135,17 +1139,11 @@ python3 tools/run_buddy_tests.py
 
 ## 四、秦紫轩（2413646）：SLUB 实现与测试
 
-以下两份记录由原文件全文复制，包含分阶段 Prompt 与实际 AI 输出；仅适配汇总文件中的相对链接，旧路径文字与阶段状态按历史原文保留。当前文件与日志入口见 [SLUB 原始材料](materials/originals/slub/README.md)。
+以下直接列出两份 SLUB Prompt 和对应 AI 输出，与本地原始文件同步；仅调整汇总中的标题层级和相对链接。原始记录见 [实现 Prompt](materials/originals/slub/slub_prompt1.md)、[测试 Prompt](materials/originals/slub/slub_prompt2.md)，测试结果见 [SLUB 测试记录](materials/slub-tests/report_slub.md)。历史执行阶段和旧路径文字保留原意。
 
 ### 4.1 SLUB 实现 Prompt 完整记录
 
-<details>
-<summary>展开实现 Prompt 与 AI 输出原文</summary>
-
-# SLUB 实现 Prompt 记录
-
-
-## 小模块一：通用接口、内核接入与上层分流
+#### 小模块一：通用接口、内核接入与上层分流
 
 [PROMPT]
 
@@ -1230,9 +1228,9 @@ static bool slub_free_large(void *ptr);
 **本模块验证：** 在工具链已加载的 WSL 中检查 `KMEM=0` 的构建和启动，确认新接口及接入代码不影响原内核。`KMEM=1` 可检查编译和链接，但下层未实现时不启动调用桩来冒充功能验证。结束时明确“接口与接入已完成、分配器尚未完成”；完整开启模式的启动验证安排在模块三补全下层之后。切换开关强制重建，不修改 Git 或自动提交。
 
 
-### AI 输出
+##### AI 输出
 
-#### 完成内容
+###### 完成内容
 
 模块一完成通用接口、内核接入和 SLUB 上层骨架，分配器尚未完整实现。
 
@@ -1240,7 +1238,7 @@ static bool slub_free_large(void *ptr);
 - 完成 [slub_pmm.h](../code/kern/mm/slub_pmm.h) 的管理器声明及 [slub_pmm.c](../code/kern/mm/slub_pmm.c) 的上层分流。小对象调用 Cache 接口，大对象调用页面路径；Cache、Slab 和大对象下层暂用明确的 panic 桩。
 - 修改 Makefile 和 `kern/init/init.c`：默认 `KMEM=0`，开启后按 `pmm_init → kmem_init` 初始化。原有页管理器和 `.check` 未修改。
 
-#### 实际验证与待完成内容
+###### 实际验证与待完成内容
 
 在 WSL os 的 `code` 目录执行：
 
@@ -1252,7 +1250,7 @@ make -B -j2 PMM=buddy KMEM=1 BUDDY_TEST=0
 
 关闭模式编译、链接和内核启动通过；开启模式仅检查编译、链接，通过后未运行待实现路径。没有进行对象分配释放测试。内部接口按上方 `[GUARANTEE]` 的签名生成，后续模块继续补全。
 
-## 小模块二：Cache 管理与下层调用
+#### 小模块二：Cache 管理与下层调用
 
 [PROMPT]
 
@@ -1287,9 +1285,9 @@ Cache 规格为 `16、32、64、128、256、512、1024、2048`，描述符集中
 **状态约束：** 只保存规格、管理入口及必要状态，不重复缓存可推导的信息，不增加全物理页状态表。下层待实现路径不得假装可运行。结束时说明已完成的 Cache 逻辑和仍待补全的 Slab 接口，随后停止。
 
 
-### AI 输出
+##### AI 输出
 
-#### 完成内容
+###### 完成内容
 
 模块二完成 Cache 层，保留通用接口和上层调用关系，未展开 Slab 页内算法。
 
@@ -1297,7 +1295,7 @@ Cache 规格为 `16、32、64、128、256、512、1024、2048`，描述符集中
 - `slub_cache_alloc` 查找所属 Cache 中未满的 slab，调用 `slub_take_object`；没有可用 slab 时调用 `slub_create_slab`。
 - `slub_cache_free` 调用 `slub_return_object`，最后一个对象释放后调用 `slub_destroy_slab`；链表移除由销毁函数负责，避免重复移除及回收后访问。
 
-#### 实际验证与待完成内容
+###### 实际验证与待完成内容
 
 ```bash
 make -B -j2 PMM=buddy KMEM=1 BUDDY_TEST=0
@@ -1305,7 +1303,7 @@ make -B -j2 PMM=buddy KMEM=1 BUDDY_TEST=0
 
 编译、链接通过；Slab 查找、创建、对象取还、销毁和大对象路径仍为待实现桩，因此未运行开启模式或专项测试。
 
-## 小模块三：Slab、对象槽位与大对象页面管理
+#### 小模块三：Slab、对象槽位与大对象页面管理
 
 [PROMPT]
 
@@ -1361,9 +1359,9 @@ void kfree(void *ptr);
 
 核心补全后，在已加载工具链的 WSL 中验证 Buddy、Best-Fit 分别配合 `KMEM=0/1` 的构建与启动，切换时强制重建；必要时只修复本模块引入的接口衔接问题，不重写通用接口或既有接入配置。报告实际命令和结果，不将启动或编译成功当作专项测试通过，不修改 Git。本模块不负责拦截调用者越界读写。
 
-### AI 输出
+##### AI 输出
 
-#### 完成内容与代码审阅
+###### 完成内容与代码审阅
 
 模块三补全 Slab 和大对象页面路径，分配器核心不再含待实现桩。
 
@@ -1372,7 +1370,7 @@ void kfree(void *ptr);
 - 大对象根据管理头、对齐及请求大小计算页数，检查溢出和资源不足；保存原页描述符、申请页数，完整释放一次。3036 字节不被固定视为两页请求。
 - 审阅时删除了可以直接计算的 slab 容量副本；大对象释放从断言表达式中移出，避免释放动作依赖断言副作用。未增加原请求字节数、order 或全物理页状态表。
 
-#### 实际验证与限制
+###### 实际验证与限制
 
 以下组合均强制重新编译并在 QEMU 启动成功，Buddy 构建使用 `BUDDY_TEST=0`：
 
@@ -1391,15 +1389,7 @@ byte memory management: slub_kmem_manager
 
 本轮结果只证明编译、链接和初始化接入通过，尚未运行对象分配释放专项测试；`slub_test.c/.h`、`run_slub_tests.py` 仍为空。未进行 Git 提交。
 
-
-</details>
-
 ### 4.2 SLUB 测试 Prompt 完整记录
-
-<details>
-<summary>展开测试 Prompt 与 AI 输出原文</summary>
-
-# SLUB 测试 Prompt
 
 [PROMPT]
 
@@ -1407,7 +1397,7 @@ byte memory management: slub_kmem_manager
 
 实现 `kern/mm/slub_test.c/.h` 和 `tools/run_slub_tests.py`，仅按需修改 Makefile、`kern/init/init.c` 的测试接入，以及 `kmalloc.h/.c` 和 `slub_pmm.c` 的可选字节层 `.check` 绑定。先读取真实实现，不修改分配算法、通用接口或底层页管理器来使测试通过。保留现有参数、Buddy 测试和其他成员的工作，使用 `lab2 2413646` 注释，不执行 Git 操作。
 
-输出要求：实际执行后，将 AI 完成说明和真实测试结论追加到本 Prompt 后的 “AI 输出”小节，包含结果文档与日志位置、失败或限制；未执行前不生成通过记录。
+输出要求：完成说明和真实测试结论，包含结果文档与日志位置、失败或限制；未执行前不生成通过记录。
 
 [RELY]
 
@@ -1438,7 +1428,7 @@ void slub_check(void);
 
 [SPECIFICATION]
 
-## 正常与边界测试
+#### 正常与边界测试
 
 **Pre-Condition：** 使用初始化提供的真实物理内存，已排除内核、管理信息和测试静态数据；记录本次镜像的空闲页基线，不硬编码历史页数。
 
@@ -1450,7 +1440,7 @@ void slub_check(void);
 4. **耗尽与失败：** 用真实分配形成资源不足，检查新 slab 和大对象申请失败且已有数据、计数不变；物理页耗尽时，已有 slab 的空闲槽位仍应可用。全部归还后恢复，不重置管理器。测试记录存储有容量检查，避免耗尽记录数组先于内存而误报。
 5. **框架适配：** 正常测试分别使用 Buddy、Best-Fit；验证 `KMEM=0` 的关闭语义及 `KMEM=1` 初始化不预占页面。字节接口与直接页申请可同时使用，互不侵占。
 
-## 预期断言与结果判定
+#### 预期断言与结果判定
 
 **Pre-Condition：** 每个预期断言用例独立启动，来自合法分配的指针必须保留必要的在用对象，避免因 slab 已回收而测试到其他原因。
 
@@ -1460,15 +1450,15 @@ void slub_check(void);
 
 失败时保留证据并报告原因，不放宽断言或重置状态伪造通过；测试有误可据实修正。无需重复验证 Buddy 合并算法或原评分流程，不宣称本测试等于 `make grade` 通过。
 
-### AI 输出（执行结果记录）
+##### AI 输出
 
-#### 完成内容
+###### 完成内容
 
 已实现 `slub_test.c/.h` 和 `tools/run_slub_tests.py`。按用户确认的双层自检设计，为 `kmem_manager` 增加可选 `.check`，在字节管理器初始化完成后调用；测试模式绑定 `slub_check`，原 `pmm_manager.check` 保留。初始化前误用及关闭模式由独立测试入口验证。
 
 测试代码只调用公共分配接口，不包含算法源文件，也不暴露私有函数。SLUB 算法正文与测试前逐字比对一致，仅增加测试头文件和回调绑定；Buddy、Best-Fit 及其原有测试未改。
 
-#### 实际执行结果
+###### 实际执行结果
 
 在 WSL os、已加载工具链的 `code` 目录执行：
 
@@ -1484,13 +1474,13 @@ python3 tools/run_slub_tests.py
 - 同时开启 Buddy、SLUB 自检时，实际先后输出 `[BUDDY] ALL PASS (7 groups)`、`[SLUB] ALL PASS (6 groups)`，两层回调未互相覆盖。
 - 默认 Best-Fit、`KMEM=0`、测试关闭的镜像已重新构建并启动通过，普通镜像可用 31929 页。
 
-#### 结果与限制
+###### 结果与限制
 
-[测试结果及有效性说明](materials/originals/slub/report_slub.md)；原始构建、QEMU 日志和结果 JSON 位于 `slub_test_logs/run-20261022-111315/`，每次运行保留独立目录。
+[测试结果及有效性说明](materials/slub-tests/report_slub.md)；原始构建、QEMU 日志和结果 JSON 位于 `slub_test_logs/run-20261022-111315/`，每次运行保留独立目录。
 
 这些结果支持已覆盖场景中的分配和释放行为正确，不构成所有大小、布局与执行序列的完整证明；未验证并发、越界写入拦截或地址复用后的旧指针识别，也未执行原 `make grade`。本次未进行 Git 提交。
 
-## 补充 ：单独测试 SLUB，跳过底层自检
+#### 补充 ：单独测试 SLUB，跳过底层自检
 
 [PROMPT]
 
@@ -1508,7 +1498,7 @@ python3 tools/run_slub_tests.py
 
 跳过时明确打印原因，不能输出底层测试通过；底层初始化和可用页面登记必须完整，SLUB 自检照常执行。跳过模式不启用依赖 Buddy 自检完成的专用登记钩子。核对默认页管理器下的 SLUB 正常、异常和关闭模式；保留通过 `--with-pmm-check` 显式开启底层自检的能力。跳过模式结束后只重建默认镜像，不启动它再次执行底层自检。不改 Git，不声称未经测量的加速比例。
 
-### AI 输出（底层自检开关执行记录）
+##### AI 输出
 
 已增加 `PMM_CHECK=0/1`，Makefile 默认 `1` 保留原页分配器自检；`0` 仅跳过 `.check`，打印 `PMM check skipped: PMM_CHECK=0.`，页初始化与 SLUB 自检不变。跳过时不启用 Buddy 自检依赖的专用页面登记钩子。
 
@@ -1518,18 +1508,18 @@ python3 tools/run_slub_tests.py
 python3 tools/run_slub_tests.py --skip-pmm-check
 ```
 
-本轮 29 项结果全部通过：两种页分配器下的正常测试、24 次预期拒绝和关闭模式均通过；最后只重建默认镜像，没有在跳过模式中启动默认镜像执行底层自检。结果及日志见 [report_slub.md](materials/originals/slub/report_slub.md) 和 `slub_test_logs/run-20261022-113834/`。
+本轮 29 项结果全部通过：两种页分配器下的正常测试、24 次预期拒绝和关闭模式均通过；最后只重建默认镜像，没有在跳过模式中启动默认镜像执行底层自检。结果及日志见 [report_slub.md](materials/slub-tests/report_slub.md) 和 `slub_test_logs/run-20261022-113834/`。
 
 另行验证 `BUDDY_TEST=1 PMM_CHECK=0` 时真实页面完整登记、SLUB 6 组测试通过；恢复 `PMM_CHECK=1` 时 Buddy 7 组和 SLUB 6 组自检同时通过；非法值 `PMM_CHECK=2` 被构建规则拒绝。这组开关验证日志保存在 `slub_test_logs/switch-20261022-114022/`。
 
 改动仅涉及 Makefile、`pmm.c` 的自检入口和测试运行脚本，未修改分配算法或 SLUB 测试覆盖。省去了底层自检工作，但本轮未进行严格耗时对比，不给出加速比例。未执行 Git 操作。
 
-#### 后续调整：脚本默认跳过底层自检
+###### 后续调整：脚本默认跳过底层自检
 
 按用户要求，脚本默认跳过底层自检，直接执行 `python3 tools/run_slub_tests.py` 即可。显式使用 `--with-pmm-check` 时恢复底层及双层联合自检；旧的 `--skip-pmm-check` 仍可使用，但已无须填写。Makefile 的 `PMM_CHECK ?= 1` 保持不变，本次仅调整测试脚本默认选择。已有测试结果和原始命令记录保留，本次不重跑整套分配测试。
 
 
-## 补充：默认最简 SLUB 测试
+#### 补充：默认最简 SLUB 测试
 
 [PROMPT]
 
@@ -1547,17 +1537,14 @@ python3 tools/run_slub_tests.py --skip-pmm-check
 
 每项输出明确标识 SLUB；正常用例核对全部组完成，异常用例核对具体断言，超时不得算通过。默认模式每次启动均确认底层自检被跳过，不启动额外联合测试；不改分配算法、不操作 Git。
 
-### AI 输出（默认最简测试执行结果）
+##### AI 输出
 
 已将默认模式改为仅使用 Best-Fit 提供页面，所有用例名称带 `slub`；默认 `PMM_CHECK=0`，不轮换 Buddy，不启动额外联合测试。保留 `--with-pmm-check`，仅开启同一默认底层的自检。
 
 实际执行 `python3 tools/run_slub_tests.py`，15 项结果全部通过：正常功能 6 组、12 类预期拒绝、关闭模式，以及默认镜像重建（不启动）。本轮耗时 0.67 分钟。核对全部 14 次测试启动日志，均为 `PMM=default`、`PMM_CHECK=0`，均有底层自检跳过标识，没有底层测试通过标识。
 
-日志保存在 `slub_test_logs/run-20261022-120233/`，当前结果见 [report_slub.md](materials/originals/slub/report_slub.md)。本轮未重新运行 `--with-pmm-check` 模式；未修改分配算法，未执行 Git 操作。
-
-
-</details>
+日志保存在 `slub_test_logs/run-20261022-120233/`，当前结果见 [report_slub.md](materials/slub-tests/report_slub.md)。本轮未重新运行 `--with-pmm-check` 模式；未修改分配算法，未执行 Git 操作。
 
 ### 4.3 同步队友更新后的验证
 
-保留队友 Best-Fit 修复及 QEMU `-kernel` 配置后，SLUB 默认测试 15/15 通过，耗时 0.69 分钟；Best-Fit 宿主回归 4/4 通过；原 `make grade` 两项均为 `OK`，总分 20/20。SLUB 日志见 `materials/originals/slub/slub_test_logs/run-20261022-122117/`，评分见 [整合后原始评分日志](materials/originals/slub/integration-grade.log)。原始 Prompt 文件及用户截图均按字节核对保留。
+保留队友 Best-Fit 修复及 QEMU `-kernel` 配置后，SLUB 默认测试 15/15 通过，耗时 0.69 分钟；Best-Fit 宿主回归 4/4 通过；原 `make grade` 两项均为 `OK`，总分 20/20。SLUB 日志见 `materials/slub-tests/slub_test_logs/run-20261022-122117/`，评分见 [整合后原始评分日志](materials/slub-tests/integration-grade.log)。原始 Prompt 文件及用户截图均按字节核对保留。
