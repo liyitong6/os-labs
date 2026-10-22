@@ -1,0 +1,17 @@
+[
+  [
+    "skip-buddy-fixtures",
+    true,
+    "verified completion"
+  ],
+  [
+    "checks-restored",
+    true,
+    "verified completion"
+  ],
+  [
+    "restored-default",
+    true,
+    "default image rebuilt (not booted)"
+  ]
+]

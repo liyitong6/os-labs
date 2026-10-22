@@ -1,0 +1,23 @@
+COMMAND: make -B -j2 PMM=default KMEM=1 SLUB_TEST=1 SLUB_CASE=10 BUDDY_TEST=0 PMM_CHECK=0
+make: Warning: File 'obj/kern/mm/' has modification time 0.93 s in the future
+make: Warning: File 'obj/kern/mm/slub_test.d' has modification time 1.7 s in the future
++ cc kern/init/entry.S
++ cc kern/init/init.c
++ cc kern/libs/stdio.c
++ cc kern/debug/panic.c
++ cc kern/driver/dtb.c
++ cc kern/driver/console.c
++ cc kern/mm/pmm.c
++ cc kern/mm/kmalloc.c
++ cc kern/mm/default_pmm.c
++ cc kern/mm/best_fit_pmm.c
++ cc kern/mm/buddy_pmm.c
++ cc kern/mm/slub_pmm.c
++ cc kern/mm/slub_test.c
++ cc libs/string.c
++ cc libs/printfmt.c
++ cc libs/readline.c
++ cc libs/sbi.c
++ ld bin/kernel
+riscv64-unknown-elf-objcopy bin/kernel --strip-all -O binary bin/ucore.img
+make: warning:  Clock skew detected.  Your build may be incomplete.

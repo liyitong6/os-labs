@@ -1,0 +1,17 @@
+[
+  [
+    "buddy-normal",
+    true,
+    "verified completion"
+  ],
+  [
+    "buddy-negative-01",
+    true,
+    "expected assertion"
+  ],
+  [
+    "restored-default",
+    true,
+    "default image rebuilt (not booted)"
+  ]
+]

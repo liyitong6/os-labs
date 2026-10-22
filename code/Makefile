@@ -7,8 +7,25 @@ V       := @
 
 # lab2 2413646: explicitly select Buddy; keep the existing default choice.
 PMM     ?= default
+# lab2 2413646: retain page self-checks unless explicitly skipped.
+PMM_CHECK ?= 1
+ifneq ($(PMM_CHECK),0)
+ifneq ($(PMM_CHECK),1)
+$(error PMM_CHECK must be 0 or 1)
+endif
+endif
 BUDDY_TEST ?= 0
 BUDDY_CASE ?= 0
+
+# lab2 2413646: opt-in byte allocation; preserve existing page management.
+KMEM ?= 0
+SLUB_TEST ?= 0
+SLUB_CASE ?= 0
+ifneq ($(KMEM),0)
+ifneq ($(KMEM),1)
+$(error KMEM must be 0 or 1)
+endif
+endif
 
 #ifndef GCCPREFIX
 GCCPREFIX := riscv64-unknown-elf-
@@ -113,14 +130,29 @@ KSRCDIR		+= kern/init \
 			   kern/mm
 
 KCFLAGS		+= $(addprefix -I,$(KINCLUDE))
+ifeq ($(PMM_CHECK),0)
+KCFLAGS += -DSKIP_PMM_CHECK
+endif
 
-# lab2 2413646: Buddy builds select their own allocator source.
-KERNEL_SOURCES := $(filter-out kern/mm/buddy_test.c,$(call listf_cc,$(KSRCDIR)))
+# lab2 2413646: select allocator and opt-in SLUB sources.
+KERNEL_SOURCES := $(filter-out kern/mm/buddy_test.c kern/mm/slub_test.c kern/mm/slub_pmm.c,$(call listf_cc,$(KSRCDIR)))
+ifeq ($(KMEM),1)
+KCFLAGS += -DUSE_KMEM_SLUB
+KERNEL_SOURCES += kern/mm/slub_pmm.c
+endif
+
+# lab2 2413646: byte tests are independent of the page allocator check.
+ifeq ($(SLUB_TEST),1)
+KCFLAGS += -DSLUB_TEST -DSLUB_TEST_CASE=$(SLUB_CASE)
+KERNEL_SOURCES += kern/mm/slub_test.c
+endif
+
 ifeq ($(PMM),buddy)
 KCFLAGS += -DUSE_BUDDY_PMM
 KERNEL_SOURCES := $(filter-out kern/mm/best_fit_pmm.c,$(KERNEL_SOURCES))
 # lab2 2413646: tests are opt-in and do not alter ordinary Buddy builds.
-ifeq ($(BUDDY_TEST),1)
+# Buddy registration fixtures need their check callback to finish setup.
+ifeq ($(BUDDY_TEST):$(PMM_CHECK),1:1)
 KCFLAGS += -DBUDDY_TEST -DBUDDY_TEST_CASE=$(BUDDY_CASE)
 KERNEL_SOURCES += kern/mm/buddy_test.c
 endif

@@ -1,0 +1,77 @@
+[
+  [
+    "slub-normal",
+    true,
+    "verified completion"
+  ],
+  [
+    "slub-negative-01",
+    true,
+    "expected assertion"
+  ],
+  [
+    "slub-negative-02",
+    true,
+    "expected assertion"
+  ],
+  [
+    "slub-negative-03",
+    true,
+    "expected assertion"
+  ],
+  [
+    "slub-negative-04",
+    true,
+    "expected assertion"
+  ],
+  [
+    "slub-negative-05",
+    true,
+    "expected assertion"
+  ],
+  [
+    "slub-negative-06",
+    true,
+    "expected assertion"
+  ],
+  [
+    "slub-negative-07",
+    true,
+    "expected assertion"
+  ],
+  [
+    "slub-negative-08",
+    true,
+    "expected assertion"
+  ],
+  [
+    "slub-negative-09",
+    true,
+    "expected assertion"
+  ],
+  [
+    "slub-negative-10",
+    true,
+    "expected assertion"
+  ],
+  [
+    "slub-negative-11",
+    true,
+    "expected assertion"
+  ],
+  [
+    "slub-negative-12",
+    true,
+    "expected assertion"
+  ],
+  [
+    "slub-disabled",
+    true,
+    "verified completion"
+  ],
+  [
+    "slub-restore-default",
+    true,
+    "default image rebuilt (not booted)"
+  ]
+]

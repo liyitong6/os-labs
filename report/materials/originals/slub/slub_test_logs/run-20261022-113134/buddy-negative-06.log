@@ -1,0 +1,49 @@
+COMMAND: make PMM=buddy KMEM=1 SLUB_TEST=1 SLUB_CASE=6 BUDDY_TEST=0 qemu
+make: Warning: File 'obj/kern/mm/slub_test.d' has modification time 1.8 s in the future
+
+OpenSBI v0.4 (Jul  2 2019 11:53:53)
+   ____                    _____ ____ _____
+  / __ \                  / ____|  _ \_   _|
+ | |  | |_ __   ___ _ __ | (___ | |_) || |
+ | |  | | '_ \ / _ \ '_ \ \___ \|  _ < | |
+ | |__| | |_) |  __/ | | |____) | |_) || |_
+  \____/| .__/ \___|_| |_|_____/|____/_____|
+        | |
+        |_|
+
+Platform Name          : QEMU Virt Machine
+Platform HART Features : RV64ACDFIMSU
+Platform Max HARTs     : 8
+Current Hart           : 0
+Firmware Base          : 0x80000000
+Firmware Size          : 112 KB
+Runtime SBI Version    : 0.1
+
+PMP0: 0x0000000080000000-0x000000008001ffff (A)
+PMP1: 0x0000000000000000-0xffffffffffffffff (A,R,W,X)
+DTB Init
+HartID: 0
+DTB Address: 0x82200000
+Physical Memory from DTB:
+  Base: 0x0000000080000000
+  Size: 0x0000000008000000 (128 MB)
+  End:  0x0000000087ffffff
+DTB init completed
+(THU.CST) os is loading ...
+Special kernel symbols:
+  entry  0xffffffffc02000d8 (virtual)
+  etext  0xffffffffc0201e1c (virtual)
+  edata  0xffffffffc0206018 (virtual)
+  end    0xffffffffc0206544 (virtual)
+Kernel executable memory footprint: 26KB
+memory management: buddy_pmm_manager
+Physical memory: [0x0000000080000000, 0x0000000088000000)
+Free physical pages: 31929
+PMM check skipped: no check callback installed.
+satp virtual address: 0xffffffffc0205000
+satp physical address: 0x0000000080205000
+byte memory management: slub_kmem_manager
+[SLUB EXPECT PANIC] case=6
+kernel panic at kern/mm/slub_pmm.c:93:
+    assertion failed: released
+qemu-system-riscv64: terminating on signal 15 from pid 1054 (make)

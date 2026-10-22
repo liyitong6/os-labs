@@ -1,0 +1,4 @@
+COMMAND: make -B -j2 PMM=default KMEM=1 SLUB_TEST=1 SLUB_CASE=6 BUDDY_TEST=0
+make: Warning: File 'obj/kern/mm/slub_test.d' has modification time 0.98 s in the future
+make: *** Deleting file 'obj/kern/mm/best_fit_pmm.d'
+make: *** Deleting file 'obj/kern/mm/buddy_pmm.d'

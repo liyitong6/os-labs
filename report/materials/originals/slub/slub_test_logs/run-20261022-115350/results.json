@@ -1,0 +1,147 @@
+[
+  [
+    "buddy-normal",
+    true,
+    "verified completion"
+  ],
+  [
+    "buddy-negative-01",
+    true,
+    "expected assertion"
+  ],
+  [
+    "buddy-negative-02",
+    true,
+    "expected assertion"
+  ],
+  [
+    "buddy-negative-03",
+    true,
+    "expected assertion"
+  ],
+  [
+    "buddy-negative-04",
+    true,
+    "expected assertion"
+  ],
+  [
+    "buddy-negative-05",
+    true,
+    "expected assertion"
+  ],
+  [
+    "buddy-negative-06",
+    true,
+    "expected assertion"
+  ],
+  [
+    "buddy-negative-07",
+    true,
+    "expected assertion"
+  ],
+  [
+    "buddy-negative-08",
+    true,
+    "expected assertion"
+  ],
+  [
+    "buddy-negative-09",
+    true,
+    "expected assertion"
+  ],
+  [
+    "buddy-negative-10",
+    true,
+    "expected assertion"
+  ],
+  [
+    "buddy-negative-11",
+    true,
+    "expected assertion"
+  ],
+  [
+    "buddy-negative-12",
+    true,
+    "expected assertion"
+  ],
+  [
+    "buddy-disabled",
+    true,
+    "verified completion"
+  ],
+  [
+    "bestfit-normal",
+    true,
+    "verified completion"
+  ],
+  [
+    "bestfit-negative-01",
+    true,
+    "expected assertion"
+  ],
+  [
+    "bestfit-negative-02",
+    true,
+    "expected assertion"
+  ],
+  [
+    "bestfit-negative-03",
+    true,
+    "expected assertion"
+  ],
+  [
+    "bestfit-negative-04",
+    true,
+    "expected assertion"
+  ],
+  [
+    "bestfit-negative-05",
+    true,
+    "expected assertion"
+  ],
+  [
+    "bestfit-negative-06",
+    true,
+    "expected assertion"
+  ],
+  [
+    "bestfit-negative-07",
+    true,
+    "expected assertion"
+  ],
+  [
+    "bestfit-negative-08",
+    true,
+    "expected assertion"
+  ],
+  [
+    "bestfit-negative-09",
+    true,
+    "expected assertion"
+  ],
+  [
+    "bestfit-negative-10",
+    true,
+    "expected assertion"
+  ],
+  [
+    "bestfit-negative-11",
+    true,
+    "expected assertion"
+  ],
+  [
+    "bestfit-negative-12",
+    true,
+    "expected assertion"
+  ],
+  [
+    "bestfit-disabled",
+    true,
+    "verified completion"
+  ],
+  [
+    "restored-default",
+    true,
+    "default image rebuilt (not booted)"
+  ]
+]

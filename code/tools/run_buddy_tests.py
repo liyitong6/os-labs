@@ -11,7 +11,7 @@ import time
 
 
 ROOT = Path(__file__).resolve().parents[1]
-REPORT = ROOT.parent / "report"
+REPORT = ROOT.parent / "report" / "materials" / "buddy-tests"
 LOGS = REPORT / "buddy_test_logs"
 CASES = {
     1: ("zero allocation", ["buddy_initialized && n > 0"]),
@@ -142,7 +142,7 @@ def write_report(results):
     if (LOGS / "first-env-failure-build.log").exists():
         lines += ["首次调用未加载工具链 PATH，编译器未找到，尚未执行测试；后续改用 Bash 登录环境运行。"
                   "[原错误日志](buddy_test_logs/first-env-failure-build.log)。", ""]
-    (REPORT / "buddy_test_results.md").write_text("\n".join(lines), encoding="utf-8")
+    (REPORT / "report_buddy.md").write_text("\n".join(lines), encoding="utf-8")
 
 
 def main():

@@ -1,6 +1,12 @@
 #include <console.h>
 #include <defs.h>
 #include <pmm.h>
+#ifdef SLUB_TEST
+#include <slub_test.h>
+#endif
+#ifdef USE_KMEM_SLUB
+#include <kmalloc.h>
+#endif
 #include <stdio.h>
 #include <string.h>
 #include <dtb.h>
@@ -38,6 +44,17 @@ int kern_init(void) {
 
     // grade_backtrace();
     pmm_init();  // init physical memory management
+
+#ifdef SLUB_TEST
+    slub_test_before_init();
+#endif
+
+#ifdef USE_KMEM_SLUB
+    // lab2 2413646: generic byte interface, after physical pages are available.
+    kmem_init();
+#elif defined(SLUB_TEST)
+    slub_check();  // disabled-mode contract has no byte manager callback
+#endif
 
     /* do nothing */
     while (1)

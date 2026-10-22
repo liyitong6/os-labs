@@ -153,6 +153,11 @@ void pmm_init(void) {
 }
 
 static void check_alloc_page(void) {
+#ifdef SKIP_PMM_CHECK
+    // lab2 2413646: page initialization remains intact; skip only self-check.
+    cprintf("PMM check skipped: PMM_CHECK=0.\n");
+    return;
+#endif
     // lab2 2413646: no test callback is different from a successful check.
     if (pmm_manager->check == NULL) {
         cprintf("PMM check skipped: no check callback installed.\n");
