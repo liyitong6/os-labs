@@ -1,14 +1,9 @@
-PROJ	:= lab2
+PROJ	:= lab3
 EMPTY	:=
 SPACE	:= $(EMPTY) $(EMPTY)
 SLASH	:= /
 
 V       := @
-
-# lab2 2413646: explicitly select Buddy; keep the existing default choice.
-PMM     ?= default
-BUDDY_TEST ?= 0
-BUDDY_CASE ?= 0
 
 #ifndef GCCPREFIX
 GCCPREFIX := riscv64-unknown-elf-
@@ -103,6 +98,7 @@ $(call add_files_cc,$(call listf_cc,$(LIBDIR)),libs,)
 
 KINCLUDE	+= kern/debug/ \
 			   kern/driver/ \
+			   kern/trap/ \
 			   kern/mm/ \
 			   kern/arch/
 
@@ -110,26 +106,15 @@ KSRCDIR		+= kern/init \
 			   kern/libs \
 			   kern/debug \
 			   kern/driver \
+			   kern/trap \
 			   kern/mm
 
 KCFLAGS		+= $(addprefix -I,$(KINCLUDE))
 
-# lab2 2413646: Buddy builds select their own allocator source.
-KERNEL_SOURCES := $(filter-out kern/mm/buddy_test.c,$(call listf_cc,$(KSRCDIR)))
-ifeq ($(PMM),buddy)
-KCFLAGS += -DUSE_BUDDY_PMM
-KERNEL_SOURCES := $(filter-out kern/mm/best_fit_pmm.c,$(KERNEL_SOURCES))
-# lab2 2413646: tests are opt-in and do not alter ordinary Buddy builds.
-ifeq ($(BUDDY_TEST),1)
-KCFLAGS += -DBUDDY_TEST -DBUDDY_TEST_CASE=$(BUDDY_CASE)
-KERNEL_SOURCES += kern/mm/buddy_test.c
-endif
-endif
-
 ifeq ($(MAKECMDGOALS),test)
-$(call add_files_cc2,$(KERNEL_SOURCES),kernel,$(KCFLAGS))
+$(call add_files_cc2,$(call listf_cc,$(KSRCDIR)),kernel,$(KCFLAGS))
 else
-$(call add_files_cc,$(KERNEL_SOURCES),kernel,$(KCFLAGS))
+$(call add_files_cc,$(call listf_cc,$(KSRCDIR)),kernel,$(KCFLAGS))
 endif
 KOBJS	= $(call read_packet,kernel libs)
 
@@ -213,11 +198,11 @@ GRADE_GDB_IN	:= .gdb.in
 GRADE_QEMU_OUT	:= .qemu.out
 HANDIN			:= proj$(PROJ)-handin.tar.gz
 
-TOUCH_FILES		:=
+TOUCH_FILES		:= kern/trap/trap.c
 
 MAKEOPTS		:= --quiet --no-print-directory
 
-GRADE_TMP	:= /tmp/lab2_grade
+GRADE_TMP	:= /tmp/lab3_grade
 
 grade:
 	$(V)$(MAKE) $(MAKEOPTS) clean

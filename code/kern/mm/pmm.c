@@ -1,8 +1,5 @@
 #include <default_pmm.h>
 #include <best_fit_pmm.h>
-#ifdef USE_BUDDY_PMM
-#include <buddy_pmm.h>
-#endif
 #include <defs.h>
 #include <error.h>
 #include <memlayout.h>
@@ -11,11 +8,9 @@
 #include <sbi.h>
 #include <stdio.h>
 #include <string.h>
+#include <../sync/sync.h>
 #include <riscv.h>
 #include <dtb.h>
-#ifdef BUDDY_TEST
-#include <buddy_test.h>
-#endif
 
 // virtual address of physical page array
 struct Page *pages;
@@ -40,12 +35,7 @@ static void check_alloc_page(void);
 
 // init_pmm_manager - initialize a pmm_manager instance
 static void init_pmm_manager(void) {
-    // lab2 2413646: retain the default manager unless Buddy is selected.
-#ifdef USE_BUDDY_PMM
-    pmm_manager = &buddy_pmm_manager;
-#else
-    pmm_manager = &best_fit_pmm_manager;
-#endif
+    pmm_manager = &default_pmm_manager;
     cprintf("memory management: %s\n", pmm_manager->name);
     pmm_manager->init();
 }
@@ -58,21 +48,40 @@ static void init_memmap(struct Page *base, size_t n) {
 // alloc_pages - call pmm->alloc_pages to allocate a continuous n*PAGESIZE
 // memory
 struct Page *alloc_pages(size_t n) {
-    return pmm_manager->alloc_pages(n);
+    struct Page *page = NULL;
+    bool intr_flag;
+    local_intr_save(intr_flag);
+    {
+        page = pmm_manager->alloc_pages(n);
+    }
+    local_intr_restore(intr_flag);
+    return page;
 }
 
 // free_pages - call pmm->free_pages to free a continuous n*PAGESIZE memory
 void free_pages(struct Page *base, size_t n) {
-    pmm_manager->free_pages(base, n);
+    bool intr_flag;
+    local_intr_save(intr_flag);
+    {
+        pmm_manager->free_pages(base, n);
+    }
+    local_intr_restore(intr_flag);
 }
 
 // nr_free_pages - call pmm->nr_free_pages to get the size (nr*PAGESIZE)
 // of current free memory
 size_t nr_free_pages(void) {
-    return pmm_manager->nr_free_pages();
+    size_t ret;
+    bool intr_flag;
+    local_intr_save(intr_flag);
+    {
+        ret = pmm_manager->nr_free_pages();
+    }
+    local_intr_restore(intr_flag);
+    return ret;
 }
 
-//lab2 function1 2412933
+//lab2 function1 2412933 (carried over from lab2)
 
 static void page_init(void) {
     extern char end[];
@@ -118,12 +127,7 @@ static void page_init(void) {
         list_init(&pages[i].page_link);
     }
 
-    // lab2 2413646: test-only registration uses the same real available RAM.
-#ifdef BUDDY_TEST
-    buddy_test_init_memmap(pa2page(free_start), (free_end - free_start) / PGSIZE);
-#else
     init_memmap(pa2page(free_start), (free_end - free_start) / PGSIZE);
-#endif
 
     cprintf("Physical memory: [0x%016lx, 0x%016lx)\n",
             (unsigned long)mem_base, (unsigned long)mem_end);
@@ -153,11 +157,6 @@ void pmm_init(void) {
 }
 
 static void check_alloc_page(void) {
-    // lab2 2413646: no test callback is different from a successful check.
-    if (pmm_manager->check == NULL) {
-        cprintf("PMM check skipped: no check callback installed.\n");
-        return;
-    }
     pmm_manager->check();
     cprintf("check_alloc_page() succeeded!\n");
 }

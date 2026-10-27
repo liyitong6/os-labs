@@ -1,0 +1,343 @@
+--- a/Makefile
++++ b/Makefile
+@@ -167,14 +167,14 @@
+ 		-machine virt \
+ 		-nographic \
+ 		-bios default \
+-		-device loader,file=$(UCOREIMG),addr=0x80200000
++		-kernel $(UCOREIMG)
+ 
+ debug: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
+ 	$(V)$(QEMU) \
+ 		-machine virt \
+ 		-nographic \
+ 		-bios default \
+-		-device loader,file=$(UCOREIMG),addr=0x80200000\
++		-kernel $(UCOREIMG)\
+ 		-s -S
+ 
+ gdb:
+@@ -188,7 +188,7 @@
+ 		-machine virt \
+ 		-nographic \
+ 		-bios default \
+-		-device loader,file=$(UCOREIMG),addr=0x80200000
++		-kernel $(UCOREIMG)
+ spike: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
+ 	$(V)$(SPIKE) $(UCOREIMG)
+ 
+--- a/kern/init/entry.S
++++ b/kern/init/entry.S
+@@ -62,8 +62,11 @@
+ # 分配 4KiB 内存给预设的三级页表
+ boot_page_table_sv39:
+     # 0xffffffff_c0000000 map to 0x80000000 (1G)
+-    # 前 511 个页表项均设置为 0 ，因此 V=0 ，意味着是空的(unmapped)
+-    .zero 8 * 511
++    # lab2 boot compatibility: retain the identity mapping while enabling satp.
++    # Root entry 2 maps the current physical boot PC; entry 511 maps the kernel VA.
++    .zero 8 * 2
++    .quad (0x80000 << 10) | 0xcf
++    .zero 8 * 508
+     # 设置最后一个页表项，PPN=0x80000，标志位 VRWXAD 均为 1
+     .quad (0x80000 << 10) | 0xcf # VRWXAD
+ 
+--- a/kern/mm/best_fit_pmm.c
++++ b/kern/mm/best_fit_pmm.c
+@@ -4,7 +4,138 @@
+ #include <best_fit_pmm.h>
+ #include <stdio.h>
+ 
+-//lab2 请补充你在lab2中的代码
++//lab2 function2-2 2413524 (carried over from lab2)
++
++static free_area_t free_area;
++
++#define free_list (free_area.free_list)
++#define nr_free (free_area.nr_free)
++
++static void
++best_fit_init(void) {
++    list_init(&free_list);
++    nr_free = 0;
++}
++
++static void
++best_fit_init_memmap(struct Page *base, size_t n) {
++    assert(n > 0);
++    struct Page *p = base;
++    for (; p != base + n; p++) {
++        assert(PageReserved(p));
++        p->flags = p->property = 0;
++        set_page_ref(p, 0);
++    }
++    base->property = n;
++    SetPageProperty(base);
++    nr_free += n;
++    if (list_empty(&free_list)) {
++        list_add(&free_list, &(base->page_link));
++    } else {
++        list_entry_t *le = &free_list;
++        while ((le = list_next(le)) != &free_list) {
++            struct Page *page = le2page(le, page_link);
++            if (base < page) {
++                list_add_before(le, &(base->page_link));
++                break;
++            } else if (list_next(le) == &free_list) {
++                list_add(le, &(base->page_link));
++                break;
++            }
++        }
++    }
++}
++
++static struct Page *
++best_fit_alloc_pages(size_t n) {
++    assert(n > 0);
++    if (n > nr_free) {
++        return NULL;
++    }
++    /* Best-Fit: scan the whole free list and pick the block whose property
++     * is the smallest among all blocks with property >= n. */
++    struct Page *page = NULL;
++    list_entry_t *le = &free_list;
++    while ((le = list_next(le)) != &free_list) {
++        struct Page *p = le2page(le, page_link);
++        if (p->property >= n) {
++            if (page == NULL || p->property < page->property) {
++                page = p;
++            }
++        }
++    }
++    if (page != NULL) {
++        list_entry_t *prev = list_prev(&(page->page_link));
++        list_del(&(page->page_link));
++        if (page->property > n) {
++            struct Page *p = page + n;
++            p->property = page->property - n;
++            SetPageProperty(p);
++            list_add(prev, &(p->page_link));
++        }
++        nr_free -= n;
++        ClearPageProperty(page);
++    }
++    return page;
++}
++
++static void
++best_fit_free_pages(struct Page *base, size_t n) {
++    assert(n > 0);
++    struct Page *p = base;
++    for (; p != base + n; p++) {
++        assert(!PageReserved(p) && !PageProperty(p));
++        p->flags = 0;
++        set_page_ref(p, 0);
++    }
++    base->property = n;
++    SetPageProperty(base);
++    nr_free += n;
++
++    if (list_empty(&free_list)) {
++        list_add(&free_list, &(base->page_link));
++    } else {
++        list_entry_t *le = &free_list;
++        while ((le = list_next(le)) != &free_list) {
++            struct Page *page = le2page(le, page_link);
++            if (base < page) {
++                list_add_before(le, &(base->page_link));
++                break;
++            } else if (list_next(le) == &free_list) {
++                list_add(le, &(base->page_link));
++                break;
++            }
++        }
++    }
++
++    /* coalesce with predecessor if adjacent */
++    list_entry_t *le = list_prev(&(base->page_link));
++    if (le != &free_list) {
++        p = le2page(le, page_link);
++        if (p + p->property == base) {
++            p->property += base->property;
++            ClearPageProperty(base);
++            list_del(&(base->page_link));
++            base = p;
++        }
++    }
++
++    /* coalesce with successor if adjacent */
++    le = list_next(&(base->page_link));
++    if (le != &free_list) {
++        p = le2page(le, page_link);
++        if (base + base->property == p) {
++            base->property += p->property;
++            ClearPageProperty(p);
++            list_del(&(p->page_link));
++        }
++    }
++}
++
++static size_t
++best_fit_nr_free_pages(void) {
++    return nr_free;
++}
+ 
+ static void
+ basic_check(void) {
+@@ -139,4 +270,12 @@
+     #endif
+ }
+ 
+-
++const struct pmm_manager best_fit_pmm_manager = {
++    .name = "best_fit_pmm_manager",
++    .init = best_fit_init,
++    .init_memmap = best_fit_init_memmap,
++    .alloc_pages = best_fit_alloc_pages,
++    .free_pages = best_fit_free_pages,
++    .nr_free_pages = best_fit_nr_free_pages,
++    .check = best_fit_check,
++};
+--- a/kern/mm/memlayout.h
++++ b/kern/mm/memlayout.h
+@@ -9,6 +9,7 @@
+ // QEMU 缺省的RAM为 0x80000000到0x88000000, 128MiB, 0x80000000到0x80200000被OpenSBI占用
+ #define KERNTOP             (KERNBASE + KMEMSIZE) // 0x88000000对应的虚拟地址
+ 
++#define PHYSICAL_MEMORY_END         0x88000000
+ #define PHYSICAL_MEMORY_OFFSET      0xFFFFFFFF40000000
+ 
+ 
+--- a/kern/mm/pmm.c
++++ b/kern/mm/pmm.c
+@@ -81,7 +81,58 @@
+     return ret;
+ }
+ 
+-//lab2 请补充你在lab2中的代码
++//lab2 function1 2412933 (carried over from lab2)
++
++static void page_init(void) {
++    extern char end[];
++
++    uintptr_t mem_base = get_memory_base();
++    uintptr_t mem_size = get_memory_size();
++    if (mem_base != DRAM_BASE || mem_size == 0 ||
++        mem_base + mem_size < mem_base) {
++        panic("invalid physical memory information");
++    }
++
++    uintptr_t mem_end = mem_base + mem_size;
++    if (mem_end > PHYSICAL_MEMORY_END) {
++        mem_end = PHYSICAL_MEMORY_END;
++    }
++
++    va_pa_offset = PHYSICAL_MEMORY_OFFSET;
++    npage = PPN(mem_end);
++    if (npage <= nbase) {
++        panic("not enough physical memory");
++    }
++
++    size_t page_count = npage - nbase;
++    pages = (struct Page *)ROUNDUP((uintptr_t)end, PGSIZE);
++    uintptr_t pages_pa = PADDR(pages);
++    uintptr_t free_end = ROUNDDOWN(mem_end, PGSIZE);
++    if (pages_pa >= free_end ||
++        page_count > (free_end - pages_pa) / sizeof(struct Page)) {
++        panic("not enough memory for Page descriptors");
++    }
++
++    uintptr_t free_start =
++        ROUNDUP(pages_pa + page_count * sizeof(struct Page), PGSIZE);
++    if (free_start >= free_end) {
++        panic("no free physical pages");
++    }
++
++    for (size_t i = 0; i < page_count; i++) {
++        pages[i].flags = 0;
++        pages[i].property = 0;
++        set_page_ref(&pages[i], 0);
++        SetPageReserved(&pages[i]);
++        list_init(&pages[i].page_link);
++    }
++
++    init_memmap(pa2page(free_start), (free_end - free_start) / PGSIZE);
++
++    cprintf("Physical memory: [0x%016lx, 0x%016lx)\n",
++            (unsigned long)mem_base, (unsigned long)mem_end);
++    cprintf("Free physical pages: %lu\n", (unsigned long)nr_free_pages());
++}
+ 
+ /* pmm_init - initialize the physical memory management */
+ void pmm_init(void) {
+--- a/kern/trap/trapentry.S
++++ b/kern/trap/trapentry.S
+@@ -56,7 +56,45 @@
+ 
+     .macro RESTORE_ALL
+ 
+-    #lab3 function1 YOUR CODE
++    #lab3 function1 2412933
++    # Restore return state before restoring the scratch registers used here.
++    LOAD s1, 32*REGBYTES(sp)
++    LOAD s2, 33*REGBYTES(sp)
++    csrw sstatus, s1
++    csrw sepc, s2
++
++    # Keep sp pointing at the trapframe until all other registers are loaded.
++    LOAD x1, 1*REGBYTES(sp)
++    LOAD x3, 3*REGBYTES(sp)
++    LOAD x4, 4*REGBYTES(sp)
++    LOAD x5, 5*REGBYTES(sp)
++    LOAD x6, 6*REGBYTES(sp)
++    LOAD x7, 7*REGBYTES(sp)
++    LOAD x8, 8*REGBYTES(sp)
++    LOAD x9, 9*REGBYTES(sp)
++    LOAD x10, 10*REGBYTES(sp)
++    LOAD x11, 11*REGBYTES(sp)
++    LOAD x12, 12*REGBYTES(sp)
++    LOAD x13, 13*REGBYTES(sp)
++    LOAD x14, 14*REGBYTES(sp)
++    LOAD x15, 15*REGBYTES(sp)
++    LOAD x16, 16*REGBYTES(sp)
++    LOAD x17, 17*REGBYTES(sp)
++    LOAD x18, 18*REGBYTES(sp)
++    LOAD x19, 19*REGBYTES(sp)
++    LOAD x20, 20*REGBYTES(sp)
++    LOAD x21, 21*REGBYTES(sp)
++    LOAD x22, 22*REGBYTES(sp)
++    LOAD x23, 23*REGBYTES(sp)
++    LOAD x24, 24*REGBYTES(sp)
++    LOAD x25, 25*REGBYTES(sp)
++    LOAD x26, 26*REGBYTES(sp)
++    LOAD x27, 27*REGBYTES(sp)
++    LOAD x28, 28*REGBYTES(sp)
++    LOAD x29, 29*REGBYTES(sp)
++    LOAD x30, 30*REGBYTES(sp)
++    LOAD x31, 31*REGBYTES(sp)
++    LOAD x2, 2*REGBYTES(sp)
+ 
+     .endm
+ 
+@@ -65,7 +103,9 @@
+ __alltraps:
+     SAVE_ALL
+ 
+-    #lab3 function1 YOUR CODE
++    #lab3 function1 2412933
++    mv a0, sp
++    jal trap
+     # sp should be the same as before "jal trap"
+ 
+     .globl __trapret
+--- a/tools/grade.sh
++++ b/tools/grade.sh
+@@ -32,7 +32,7 @@
+     echo "Running $label..."
+     timeout "${seconds}s" qemu-system-riscv64 \
+         -machine virt -nographic -bios default \
+-        -device loader,file=bin/ucore.img,addr=0x80200000 \
++        -kernel bin/ucore.img \
+         -serial file:"$output" -monitor none -no-reboot >/dev/null 2>&1 || true
+ 
+     passed=1
