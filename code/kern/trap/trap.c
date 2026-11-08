@@ -6,10 +6,14 @@
 #include <memlayout.h>
 #include <mmu.h>
 #include <riscv.h>
+#include <sbi.h>
 #include <stdio.h>
 #include <trap.h>
 
 #define TICK_NUM 100
+#ifndef SHUTDOWN_AFTER
+#define SHUTDOWN_AFTER 10
+#endif
 
 static void print_ticks() {
     cprintf("%d ticks\n", TICK_NUM);
@@ -99,6 +103,10 @@ void interrupt_handler(struct trapframe *tf) {
         ticks++;
         if (ticks % TICK_NUM == 0) {
             print_ticks();         /* 打印 "100 ticks" */
+            // lab3 function2 2413646: shut down after the configured print count.
+            if (ticks / TICK_NUM >= SHUTDOWN_AFTER) {
+                sbi_shutdown();
+            }
         }
         break;
     }
@@ -115,6 +123,31 @@ void interrupt_handler(struct trapframe *tf) {
     }
 }
 
+
+// lab3 function2 2413646: C exception handling and return address update.
+void exception_handler(struct trapframe *tf) {
+    switch (tf->cause) {
+    case CAUSE_ILLEGAL_INSTRUCTION:
+        cprintf("Illegal instruction at 0x%016lx\n", (unsigned long)tf->epc);
+        break;
+    case CAUSE_BREAKPOINT:
+        cprintf("Breakpoint at 0x%016lx\n", (unsigned long)tf->epc);
+        break;
+    default:
+        print_trapframe(tf);
+        return;
+    }
+
+    const uint16_t instruction = *(const uint16_t *)tf->epc;
+    if ((instruction & 0x3) != 0x3) {
+        tf->epc += 2;
+    } else if ((instruction & 0x1f) != 0x1f) {
+        tf->epc += 4;
+    } else {
+        // Longer encodings are outside this lab's 16/32-bit recovery scope.
+        print_trapframe(tf);
+    }
+}
 
 static inline void trap_dispatch(struct trapframe *tf) {
     if ((intptr_t)tf->cause < 0) {
