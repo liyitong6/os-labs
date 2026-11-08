@@ -84,7 +84,7 @@ void print_regs(struct pushregs *gpr) {
     cprintf("  t6       0x%08x\n", gpr->t6);
 }
 
-//lab3 function2 YOUR CODE
+//lab3 function2 2413524
 /*
  * interrupt_handler - B 部分：处理 S 态中断。
  * 由 trap_dispatch 在 (intptr_t)tf->cause < 0（scause 最高位=1）时调用。

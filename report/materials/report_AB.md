@@ -1,6 +1,5 @@
-# Lab3 实验报告
 
-## 1. 本阶段范围
+## 1. A阶段范围
 
 负责成员：李易桐，学号 2412933。
 
@@ -147,11 +146,5 @@ Trap 现场保存与进程上下文切换都涉及寄存器状态管理，但本
 | Test 2：非法指令 EPC 推进与返回（C 为主） | 25 | `Supervisor software interrupt`、`Unknown interrupt: cause 15`（B 的软件/兜底分支被测试直接调用） |
 | Test 3：持续 S 态时钟中断（B） | 40 | `100 ticks`（多行）、`ticks=200`（时钟持续重武装、ticks 累加到 200） |
 
-### 7.6 待 C 完成后补充
 
-- C 合入 `exception_handler()` 后整树链接，在 `code/` 目录跑 `make` 与 `sh tools/grade.sh`，补 `Total Score: 100/100` 的实际输出与截图。
-- 汇总 A/B/C 三人 prompt（A、本目录 `prompt_B.md`、C 的 prompt）成一节。
-- 核对整份报告理论分析与截图引用。
-
-> 说明：在 C 合入 `exception_handler()` 之前，`trap_dispatch()` 引用的 `exception_handler` 尚未定义，整树无法链接通过；本部分 `interrupt_handler()` 本身已写完并自检逻辑，待 C 代码到位后即可整体编译评分。
 
