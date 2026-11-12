@@ -218,7 +218,201 @@ init_main(void *arg)
     return 0;
 }
 
-//LAB4 function2 YOUR CODE
+//LAB4 function2 2413524
+
+// alloc_proc - allocate a PCB and put every field into a safe, known state.
+// A zeroed block plus explicit initial values guarantees that no later code
+// can observe an uninitialized field (stale pointer, garbage flags, etc.).
+static struct proc_struct *
+alloc_proc(void)
+{
+    struct proc_struct *proc = kmalloc(sizeof(struct proc_struct));
+    if (proc != NULL)
+    {
+        // Zero the whole block first so every field and padding start clean.
+        memset(proc, 0, sizeof(struct proc_struct));
+
+        proc->state = PROC_UNINIT; // newly created, not yet registered
+        proc->pid = -1;            // no identity assigned yet
+        proc->runs = 0;
+        proc->kstack = 0;
+        proc->need_resched = 0;
+        proc->parent = NULL;
+        proc->mm = NULL;
+        proc->tf = NULL;
+        // Kernel threads share the boot page table; pgdir holds its physical
+        // address because satp expects a physical page number.
+        proc->pgdir = boot_pgdir_pa;
+        proc->flags = 0;
+        // context and name are already zero after memset; reset them again
+        // explicitly to make the intent obvious.
+        memset(&proc->context, 0, sizeof(struct context));
+        memset(proc->name, 0, sizeof(proc->name));
+        list_init(&proc->list_link);
+        list_init(&proc->hash_link);
+    }
+    return proc;
+}
+
+// copy_mm - placeholder for user address-space handling. In lab4 every thread
+// is a kernel thread: current->mm is NULL and there is nothing to copy.
+static int
+copy_mm(uint32_t clone_flags, struct proc_struct *proc)
+{
+    assert(current->mm == NULL);
+    proc->mm = NULL;
+    return 0;
+}
+
+// copy_thread - place the trap frame at the top of the new kernel stack and
+// wire the callee-saved context so the first switch_to lands on forkret.
+static void
+copy_thread(struct proc_struct *proc, uintptr_t esp, struct trapframe *tf)
+{
+    // Reserve one trap frame at the highest addresses of the kernel stack.
+    proc->tf = (struct trapframe *)(proc->kstack + KSTACKSIZE) - 1;
+    *(proc->tf) = *tf;
+
+    // A freshly forked child reports 0 as its fork return value.
+    proc->tf->gpr.a0 = 0;
+
+    // After RESTORE_ALL, sret jumps to kernel_thread_entry and the CPU runs
+    // ordinary kernel C code, which needs a valid (callee-saved) stack. Point
+    // the trap frame's sp at the top of this thread's kernel stack; the trap
+    // frame itself has already been consumed by then and may be overwritten.
+    proc->tf->gpr.sp = proc->kstack + KSTACKSIZE;
+
+    // After switch_to restores this context, sp points at the trap frame and
+    // ret jumps to forkret, which runs forkrets(current->tf) -> __trapret.
+    proc->context.sp = (uintptr_t)(proc->tf);
+    proc->context.ra = (uintptr_t)forkret;
+}
+
+// do_fork - the core thread creation routine. It assembles PCB, kernel stack,
+// address space, trap frame and context, then registers the new thread under a
+// pid and wakes it. A failure before registration releases exactly the
+// resources already acquired through the goto-based cleanup ladder.
+int
+do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf)
+{
+    int ret = -E_NO_MEM;
+    struct proc_struct *proc;
+
+    // 1. Allocate a PCB.
+    if ((proc = alloc_proc()) == NULL)
+    {
+        goto fork_out;
+    }
+    proc->parent = current;
+
+    // 2. Allocate the kernel stack.
+    if (setup_kstack(proc) != 0)
+    {
+        goto bad_fork_cleanup_proc;
+    }
+
+    // 3. Handle (share) the address space.
+    if (copy_mm(clone_flags, proc) != 0)
+    {
+        goto bad_fork_cleanup_kstack;
+    }
+
+    // 4. Build trap frame and switch context.
+    copy_thread(proc, stack, tf);
+
+    // 5-6. Register the thread: pid, hash list, global list, counter.
+    // Interrupts are disabled so the list mutation cannot race with a timer
+    // interrupt that walks proc_list.
+    bool intr_flag;
+    local_intr_save(intr_flag);
+    {
+        proc->pid = get_pid();
+        hash_proc(proc);
+        list_add(&proc_list, &proc->list_link);
+        nr_process++;
+    }
+    local_intr_restore(intr_flag);
+
+    // 7. Make it runnable and return its pid.
+    wakeup_proc(proc);
+    ret = proc->pid;
+
+fork_out:
+    return ret;
+
+bad_fork_cleanup_kstack:
+    put_kstack(proc);
+bad_fork_cleanup_proc:
+    kfree(proc);
+    goto fork_out;
+}
+
+// kernel_thread - package an ordinary kernel function (fn/arg) into a trap
+// frame that looks like a trap taken from supervisor mode, then ask do_fork to
+// build a runnable thread from it.
+int
+kernel_thread(int (*fn)(void *), void *arg, uint32_t clone_flags)
+{
+    struct trapframe tf;
+    memset(&tf, 0, sizeof(struct trapframe));
+
+    // kernel_thread_entry reads s0 = target function and s1 = its argument.
+    tf.gpr.s0 = (uintptr_t)fn;
+    tf.gpr.s1 = (uintptr_t)arg;
+
+    // SPP=1: return to supervisor mode; SPIE=1: keep interrupts enabled after
+    // sret; SIE=0: interrupts stay off while the thread is being assembled.
+    tf.status = (read_csr(sstatus) | SSTATUS_SPP | SSTATUS_SPIE)
+                & ~SSTATUS_SIE;
+    // First-run entry point; it calls fn through s0/s1.
+    tf.epc = (uintptr_t)kernel_thread_entry;
+
+    return do_fork(clone_flags | CLONE_VM, 0, &tf);
+}
+
+// proc_init - bring up the process subsystem. The current execution context
+// (running since entry.S) is wrapped into the 0th kernel thread "idleproc",
+// then the first real kernel thread "initproc" is created via
+// kernel_thread(init_main, ...).
+void
+proc_init(void)
+{
+    // Initialize the global PCB list and every hash bucket.
+    list_init(&proc_list);
+    for (int i = 0; i < HASH_LIST_SIZE; i++)
+    {
+        list_init(hash_list + i);
+    }
+
+    if ((idleproc = alloc_proc()) == NULL)
+    {
+        panic("cannot alloc idleproc.\n");
+    }
+
+    // idleproc is not forked: it reuses the boot context and stack directly.
+    idleproc->pid = 0;
+    idleproc->state = PROC_RUNNABLE;
+    idleproc->kstack = (uintptr_t)bootstack;
+    idleproc->need_resched = 1; // ask the scheduler to run initproc ASAP
+    set_proc_name(idleproc, "idle");
+    nr_process++;
+
+    current = idleproc;
+
+    // Create the first real kernel thread; its pid must be positive.
+    int pid = kernel_thread(init_main, "Hello world!!", 0);
+    if (pid <= 0)
+    {
+        panic("create init_main failed.\n");
+    }
+
+    initproc = find_proc(pid);
+    set_proc_name(initproc, "init");
+
+    assert(idleproc != NULL && idleproc->pid == 0);
+    assert(initproc != NULL && initproc->pid == 1);
+    assert(initproc->parent == idleproc);
+}
 
 
 //LAB4 function3 2412933
