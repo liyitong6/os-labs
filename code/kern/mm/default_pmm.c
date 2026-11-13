@@ -6,7 +6,6 @@
 
 //lab2 请补充你在lab2中的代码
 
-// LAB4 function2 配套任务：衔接 Lab2 依赖（best-fit 物理页分配器）2413524
 static free_area_t free_area;
 
 #define free_list (free_area.free_list)

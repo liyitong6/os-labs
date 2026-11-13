@@ -129,7 +129,8 @@ static void *boot_alloc_page(void)
     return page2kva(p);
 }
 
-// LAB4 function2 配套任务：衔接 Lab2 依赖（物理内存初始化 page_init）2413524
+// page_init - detect physical memory, reserve kernel and page descriptors,
+// then register the remaining free pages with the pmm manager.
 static void
 page_init(void)
 {
