@@ -129,6 +129,66 @@ static void *boot_alloc_page(void)
     return page2kva(p);
 }
 
+// LAB4 function2 配套任务：衔接 Lab2 依赖（物理内存初始化 page_init）2413524
+static void
+page_init(void)
+{
+    extern char end[];
+
+    uintptr_t mem_base = get_memory_base();
+    uintptr_t mem_size = get_memory_size();
+    if (mem_base != DRAM_BASE || mem_size == 0 ||
+        mem_base + mem_size < mem_base)
+    {
+        panic("invalid physical memory information");
+    }
+
+    uintptr_t mem_end = mem_base + mem_size;
+    if (mem_end > PHYSICAL_MEMORY_END)
+    {
+        mem_end = PHYSICAL_MEMORY_END;
+    }
+
+    va_pa_offset = PHYSICAL_MEMORY_OFFSET;
+    npage = PPN(mem_end);
+    if (npage <= nbase)
+    {
+        panic("not enough physical memory");
+    }
+
+    size_t page_count = npage - nbase;
+    pages = (struct Page *)ROUNDUP((uintptr_t)end, PGSIZE);
+    uintptr_t pages_pa = PADDR(pages);
+    uintptr_t free_end = ROUNDDOWN(mem_end, PGSIZE);
+    if (pages_pa >= free_end ||
+        page_count > (free_end - pages_pa) / sizeof(struct Page))
+    {
+        panic("not enough memory for Page descriptors");
+    }
+
+    uintptr_t free_start =
+        ROUNDUP(pages_pa + page_count * sizeof(struct Page), PGSIZE);
+    if (free_start >= free_end)
+    {
+        panic("no free physical pages");
+    }
+
+    for (size_t i = 0; i < page_count; i++)
+    {
+        pages[i].flags = 0;
+        pages[i].property = 0;
+        set_page_ref(&pages[i], 0);
+        SetPageReserved(&pages[i]);
+        list_init(&pages[i].page_link);
+    }
+
+    init_memmap(pa2page(free_start), (free_end - free_start) / PGSIZE);
+
+    cprintf("Physical memory: [0x%016lx, 0x%016lx)\n",
+            (unsigned long)mem_base, (unsigned long)mem_end);
+    cprintf("Free physical pages: %lu\n", (unsigned long)nr_free_pages());
+}
+
 // pmm_init - setup a pmm to manage physical memory, build PDT&PT to setup
 // paging mechanism
 //         - check the correctness of pmm & paging mechanism, print PDT&PT
