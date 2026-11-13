@@ -1,0 +1,99 @@
+Scope: production B code; manual PCBs/stacks/page tables are test fixtures.
+This is not the official full-lab 30-point grade.
+COMMAND: /home/liyitong/compiler-env/riscv-elf-toolchains/bin/riscv64-unknown-elf-gcc --version
+riscv64-unknown-elf-gcc (g1b306039ac4) 15.1.0
+Copyright (C) 2025 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+COMMAND: /opt/qemu/bin/qemu-system-riscv64 --version
+QEMU emulator version 7.0.0
+Copyright (c) 2003-2022 Fabrice Bellard and the QEMU Project developers
+SOURCE kern/process/proc.c 4286e1914acb145075dd1073ceac6cdc56c046aeb02cbc97b681ed9ea41fac93
+SOURCE kern/schedule/sched.c 6a22b6748f1445f860a1ff1639cf284b6a689f012611c8ae7059521059d72574
+SOURCE kern/process/switch.S a914d478ded620231e7bf5d48b2c5113f8572da9d0de41e393d812f08970b613
+SOURCE kern/trap/trap.c a9b9993586460b65a016bf311660c9ba367214d9919e3207aae96e5e1f21feaa
+SOURCE kern/trap/trapentry.S 3c3bf289fc7106e168e0d3aa45b57966fd0f07787057989b8fe8569da8be5aa6
+SOURCE kern/driver/intr.c f9319a63bdc6fc89bf908bb0547055f742e04b8b584e197f67d73d26916d379a
+SOURCE kern/driver/clock.c 56d92c15188de28ec7855e2d9c28e103abda2604a9b008c6e9ccfe35e40bf32b
+SOURCE kern/libs/stdio.c ec4025066399569651355d0f3707b55c75dc6e1f548647465f309b702d626871
+SOURCE libs/printfmt.c d25c73d7fd49340ab218854bcdc6b6fbaf6e476b6dbc86659e06a81df20410a6
+SOURCE libs/string.c 7870cfea55cd38606311ecfb74da1a0dc33d1a925e1b415efe8d84df89778c89
+COMMAND: /home/liyitong/compiler-env/riscv-elf-toolchains/bin/riscv64-unknown-elf-gcc -march=rv64imac_zicsr_zifencei -mabi=lp64 -mcmodel=medany -mno-relax -msmall-data-limit=0 -O2 -std=gnu99 -g -fno-builtin -fno-pic -nostdinc -fno-stack-protector -ffunction-sections -fdata-sections -Wall -Wno-unused -Werror=implicit-function-declaration -I/home/liyitong/oslab/os-labs/code/libs -I/home/liyitong/oslab/os-labs/code/kern/debug -I/home/liyitong/oslab/os-labs/code/kern/driver -I/home/liyitong/oslab/os-labs/code/kern/trap -I/home/liyitong/oslab/os-labs/code/kern/mm -I/home/liyitong/oslab/os-labs/code/kern/sync -I/home/liyitong/oslab/os-labs/code/kern/process -I/home/liyitong/oslab/os-labs/code/kern/schedule -c /home/liyitong/oslab/os-labs/code/kern/process/proc.c -o /tmp/lab4-b-runtime-lfettch0/b-0.o
+COMMAND: /home/liyitong/compiler-env/riscv-elf-toolchains/bin/riscv64-unknown-elf-gcc -march=rv64imac_zicsr_zifencei -mabi=lp64 -mcmodel=medany -mno-relax -msmall-data-limit=0 -O2 -std=gnu99 -g -fno-builtin -fno-pic -nostdinc -fno-stack-protector -ffunction-sections -fdata-sections -Wall -Wno-unused -Werror=implicit-function-declaration -I/home/liyitong/oslab/os-labs/code/libs -I/home/liyitong/oslab/os-labs/code/kern/debug -I/home/liyitong/oslab/os-labs/code/kern/driver -I/home/liyitong/oslab/os-labs/code/kern/trap -I/home/liyitong/oslab/os-labs/code/kern/mm -I/home/liyitong/oslab/os-labs/code/kern/sync -I/home/liyitong/oslab/os-labs/code/kern/process -I/home/liyitong/oslab/os-labs/code/kern/schedule -c /home/liyitong/oslab/os-labs/code/kern/schedule/sched.c -o /tmp/lab4-b-runtime-lfettch0/b-1.o
+COMMAND: /home/liyitong/compiler-env/riscv-elf-toolchains/bin/riscv64-unknown-elf-gcc -march=rv64imac_zicsr_zifencei -mabi=lp64 -mcmodel=medany -mno-relax -msmall-data-limit=0 -O2 -std=gnu99 -g -fno-builtin -fno-pic -nostdinc -fno-stack-protector -ffunction-sections -fdata-sections -Wall -Wno-unused -Werror=implicit-function-declaration -I/home/liyitong/oslab/os-labs/code/libs -I/home/liyitong/oslab/os-labs/code/kern/debug -I/home/liyitong/oslab/os-labs/code/kern/driver -I/home/liyitong/oslab/os-labs/code/kern/trap -I/home/liyitong/oslab/os-labs/code/kern/mm -I/home/liyitong/oslab/os-labs/code/kern/sync -I/home/liyitong/oslab/os-labs/code/kern/process -I/home/liyitong/oslab/os-labs/code/kern/schedule -c /home/liyitong/oslab/os-labs/code/kern/process/switch.S -o /tmp/lab4-b-runtime-lfettch0/b-2.o
+COMMAND: /home/liyitong/compiler-env/riscv-elf-toolchains/bin/riscv64-unknown-elf-gcc -march=rv64imac_zicsr_zifencei -mabi=lp64 -mcmodel=medany -mno-relax -msmall-data-limit=0 -O2 -std=gnu99 -g -fno-builtin -fno-pic -nostdinc -fno-stack-protector -ffunction-sections -fdata-sections -Wall -Wno-unused -Werror=implicit-function-declaration -I/home/liyitong/oslab/os-labs/code/libs -I/home/liyitong/oslab/os-labs/code/kern/debug -I/home/liyitong/oslab/os-labs/code/kern/driver -I/home/liyitong/oslab/os-labs/code/kern/trap -I/home/liyitong/oslab/os-labs/code/kern/mm -I/home/liyitong/oslab/os-labs/code/kern/sync -I/home/liyitong/oslab/os-labs/code/kern/process -I/home/liyitong/oslab/os-labs/code/kern/schedule -c /home/liyitong/oslab/os-labs/code/kern/trap/trap.c -o /tmp/lab4-b-runtime-lfettch0/b-3.o
+COMMAND: /home/liyitong/compiler-env/riscv-elf-toolchains/bin/riscv64-unknown-elf-gcc -march=rv64imac_zicsr_zifencei -mabi=lp64 -mcmodel=medany -mno-relax -msmall-data-limit=0 -O2 -std=gnu99 -g -fno-builtin -fno-pic -nostdinc -fno-stack-protector -ffunction-sections -fdata-sections -Wall -Wno-unused -Werror=implicit-function-declaration -I/home/liyitong/oslab/os-labs/code/libs -I/home/liyitong/oslab/os-labs/code/kern/debug -I/home/liyitong/oslab/os-labs/code/kern/driver -I/home/liyitong/oslab/os-labs/code/kern/trap -I/home/liyitong/oslab/os-labs/code/kern/mm -I/home/liyitong/oslab/os-labs/code/kern/sync -I/home/liyitong/oslab/os-labs/code/kern/process -I/home/liyitong/oslab/os-labs/code/kern/schedule -c /home/liyitong/oslab/os-labs/code/kern/trap/trapentry.S -o /tmp/lab4-b-runtime-lfettch0/b-4.o
+COMMAND: /home/liyitong/compiler-env/riscv-elf-toolchains/bin/riscv64-unknown-elf-gcc -march=rv64imac_zicsr_zifencei -mabi=lp64 -mcmodel=medany -mno-relax -msmall-data-limit=0 -O2 -std=gnu99 -g -fno-builtin -fno-pic -nostdinc -fno-stack-protector -ffunction-sections -fdata-sections -Wall -Wno-unused -Werror=implicit-function-declaration -I/home/liyitong/oslab/os-labs/code/libs -I/home/liyitong/oslab/os-labs/code/kern/debug -I/home/liyitong/oslab/os-labs/code/kern/driver -I/home/liyitong/oslab/os-labs/code/kern/trap -I/home/liyitong/oslab/os-labs/code/kern/mm -I/home/liyitong/oslab/os-labs/code/kern/sync -I/home/liyitong/oslab/os-labs/code/kern/process -I/home/liyitong/oslab/os-labs/code/kern/schedule -c /home/liyitong/oslab/os-labs/code/kern/driver/intr.c -o /tmp/lab4-b-runtime-lfettch0/b-5.o
+COMMAND: /home/liyitong/compiler-env/riscv-elf-toolchains/bin/riscv64-unknown-elf-gcc -march=rv64imac_zicsr_zifencei -mabi=lp64 -mcmodel=medany -mno-relax -msmall-data-limit=0 -O2 -std=gnu99 -g -fno-builtin -fno-pic -nostdinc -fno-stack-protector -ffunction-sections -fdata-sections -Wall -Wno-unused -Werror=implicit-function-declaration -I/home/liyitong/oslab/os-labs/code/libs -I/home/liyitong/oslab/os-labs/code/kern/debug -I/home/liyitong/oslab/os-labs/code/kern/driver -I/home/liyitong/oslab/os-labs/code/kern/trap -I/home/liyitong/oslab/os-labs/code/kern/mm -I/home/liyitong/oslab/os-labs/code/kern/sync -I/home/liyitong/oslab/os-labs/code/kern/process -I/home/liyitong/oslab/os-labs/code/kern/schedule -c /home/liyitong/oslab/os-labs/code/kern/driver/clock.c -o /tmp/lab4-b-runtime-lfettch0/b-6.o
+COMMAND: /home/liyitong/compiler-env/riscv-elf-toolchains/bin/riscv64-unknown-elf-gcc -march=rv64imac_zicsr_zifencei -mabi=lp64 -mcmodel=medany -mno-relax -msmall-data-limit=0 -O2 -std=gnu99 -g -fno-builtin -fno-pic -nostdinc -fno-stack-protector -ffunction-sections -fdata-sections -Wall -Wno-unused -Werror=implicit-function-declaration -I/home/liyitong/oslab/os-labs/code/libs -I/home/liyitong/oslab/os-labs/code/kern/debug -I/home/liyitong/oslab/os-labs/code/kern/driver -I/home/liyitong/oslab/os-labs/code/kern/trap -I/home/liyitong/oslab/os-labs/code/kern/mm -I/home/liyitong/oslab/os-labs/code/kern/sync -I/home/liyitong/oslab/os-labs/code/kern/process -I/home/liyitong/oslab/os-labs/code/kern/schedule -c /home/liyitong/oslab/os-labs/code/kern/libs/stdio.c -o /tmp/lab4-b-runtime-lfettch0/b-7.o
+COMMAND: /home/liyitong/compiler-env/riscv-elf-toolchains/bin/riscv64-unknown-elf-gcc -march=rv64imac_zicsr_zifencei -mabi=lp64 -mcmodel=medany -mno-relax -msmall-data-limit=0 -O2 -std=gnu99 -g -fno-builtin -fno-pic -nostdinc -fno-stack-protector -ffunction-sections -fdata-sections -Wall -Wno-unused -Werror=implicit-function-declaration -I/home/liyitong/oslab/os-labs/code/libs -I/home/liyitong/oslab/os-labs/code/kern/debug -I/home/liyitong/oslab/os-labs/code/kern/driver -I/home/liyitong/oslab/os-labs/code/kern/trap -I/home/liyitong/oslab/os-labs/code/kern/mm -I/home/liyitong/oslab/os-labs/code/kern/sync -I/home/liyitong/oslab/os-labs/code/kern/process -I/home/liyitong/oslab/os-labs/code/kern/schedule -c /home/liyitong/oslab/os-labs/code/libs/printfmt.c -o /tmp/lab4-b-runtime-lfettch0/b-8.o
+COMMAND: /home/liyitong/compiler-env/riscv-elf-toolchains/bin/riscv64-unknown-elf-gcc -march=rv64imac_zicsr_zifencei -mabi=lp64 -mcmodel=medany -mno-relax -msmall-data-limit=0 -O2 -std=gnu99 -g -fno-builtin -fno-pic -nostdinc -fno-stack-protector -ffunction-sections -fdata-sections -Wall -Wno-unused -Werror=implicit-function-declaration -I/home/liyitong/oslab/os-labs/code/libs -I/home/liyitong/oslab/os-labs/code/kern/debug -I/home/liyitong/oslab/os-labs/code/kern/driver -I/home/liyitong/oslab/os-labs/code/kern/trap -I/home/liyitong/oslab/os-labs/code/kern/mm -I/home/liyitong/oslab/os-labs/code/kern/sync -I/home/liyitong/oslab/os-labs/code/kern/process -I/home/liyitong/oslab/os-labs/code/kern/schedule -c /home/liyitong/oslab/os-labs/code/libs/string.c -o /tmp/lab4-b-runtime-lfettch0/b-9.o
+COMMAND: /home/liyitong/compiler-env/riscv-elf-toolchains/bin/riscv64-unknown-elf-gcc -march=rv64imac_zicsr_zifencei -mabi=lp64 -mcmodel=medany -mno-relax -msmall-data-limit=0 -O2 -std=gnu99 -g -fno-builtin -fno-pic -nostdinc -fno-stack-protector -ffunction-sections -fdata-sections -Wall -Wno-unused -Werror=implicit-function-declaration -I/home/liyitong/oslab/os-labs/code/libs -I/home/liyitong/oslab/os-labs/code/kern/debug -I/home/liyitong/oslab/os-labs/code/kern/driver -I/home/liyitong/oslab/os-labs/code/kern/trap -I/home/liyitong/oslab/os-labs/code/kern/mm -I/home/liyitong/oslab/os-labs/code/kern/sync -I/home/liyitong/oslab/os-labs/code/kern/process -I/home/liyitong/oslab/os-labs/code/kern/schedule -c /tmp/lab4-b-runtime-lfettch0/harness.c -o /tmp/lab4-b-runtime-lfettch0/b-10.o
+COMMAND: /home/liyitong/compiler-env/riscv-elf-toolchains/bin/riscv64-unknown-elf-gcc -march=rv64imac_zicsr_zifencei -mabi=lp64 -mcmodel=medany -mno-relax -msmall-data-limit=0 -O2 -std=gnu99 -g -fno-builtin -fno-pic -nostdinc -fno-stack-protector -ffunction-sections -fdata-sections -Wall -Wno-unused -Werror=implicit-function-declaration -I/home/liyitong/oslab/os-labs/code/libs -I/home/liyitong/oslab/os-labs/code/kern/debug -I/home/liyitong/oslab/os-labs/code/kern/driver -I/home/liyitong/oslab/os-labs/code/kern/trap -I/home/liyitong/oslab/os-labs/code/kern/mm -I/home/liyitong/oslab/os-labs/code/kern/sync -I/home/liyitong/oslab/os-labs/code/kern/process -I/home/liyitong/oslab/os-labs/code/kern/schedule -c /tmp/lab4-b-runtime-lfettch0/boot.S -o /tmp/lab4-b-runtime-lfettch0/b-11.o
+COMMAND: /home/liyitong/compiler-env/riscv-elf-toolchains/bin/riscv64-unknown-elf-gcc -march=rv64imac_zicsr_zifencei -mabi=lp64 -mcmodel=medany -mno-relax -msmall-data-limit=0 -O2 -std=gnu99 -g -fno-builtin -fno-pic -nostdinc -fno-stack-protector -ffunction-sections -fdata-sections -Wall -Wno-unused -Werror=implicit-function-declaration -I/home/liyitong/oslab/os-labs/code/libs -I/home/liyitong/oslab/os-labs/code/kern/debug -I/home/liyitong/oslab/os-labs/code/kern/driver -I/home/liyitong/oslab/os-labs/code/kern/trap -I/home/liyitong/oslab/os-labs/code/kern/mm -I/home/liyitong/oslab/os-labs/code/kern/sync -I/home/liyitong/oslab/os-labs/code/kern/process -I/home/liyitong/oslab/os-labs/code/kern/schedule -c /tmp/lab4-b-runtime-lfettch0/probes.S -o /tmp/lab4-b-runtime-lfettch0/b-12.o
+COMMAND: /home/liyitong/compiler-env/riscv-elf-toolchains/bin/riscv64-unknown-elf-ld -m elf64lriscv --gc-sections --wrap=switch_to -T /tmp/lab4-b-runtime-lfettch0/link.ld -o /tmp/lab4-b-runtime-lfettch0/test.elf /tmp/lab4-b-runtime-lfettch0/b-0.o /tmp/lab4-b-runtime-lfettch0/b-1.o /tmp/lab4-b-runtime-lfettch0/b-2.o /tmp/lab4-b-runtime-lfettch0/b-3.o /tmp/lab4-b-runtime-lfettch0/b-4.o /tmp/lab4-b-runtime-lfettch0/b-5.o /tmp/lab4-b-runtime-lfettch0/b-6.o /tmp/lab4-b-runtime-lfettch0/b-7.o /tmp/lab4-b-runtime-lfettch0/b-8.o /tmp/lab4-b-runtime-lfettch0/b-9.o /tmp/lab4-b-runtime-lfettch0/b-10.o /tmp/lab4-b-runtime-lfettch0/b-11.o /tmp/lab4-b-runtime-lfettch0/b-12.o
+COMMAND: /home/liyitong/compiler-env/riscv-elf-toolchains/bin/riscv64-unknown-elf-objcopy -O binary /tmp/lab4-b-runtime-lfettch0/test.elf /tmp/lab4-b-runtime-lfettch0/test.bin
+Launching QEMU for the isolated runtime checks...
+COMMAND: /opt/qemu/bin/qemu-system-riscv64 -machine virt -m 128M -smp 1 -bios default -nographic -monitor none -kernel /tmp/lab4-b-runtime-lfettch0/test.bin -no-reboot
+
+OpenSBI v1.0
+   ____                    _____ ____ _____
+  / __ \                  / ____|  _ \_   _|
+ | |  | |_ __   ___ _ __ | (___ | |_) || |
+ | |  | | '_ \ / _ \ '_ \ \___ \|  _ < | |
+ | |__| | |_) |  __/ | | |____) | |_) || |_
+  \____/| .__/ \___|_| |_|_____/|____/_____|
+        | |
+        |_|
+
+Platform Name             : riscv-virtio,qemu
+Platform Features         : medeleg
+Platform HART Count       : 1
+Platform IPI Device       : aclint-mswi
+Platform Timer Device     : aclint-mtimer @ 10000000Hz
+Platform Console Device   : uart8250
+Platform HSM Device       : ---
+Platform Reboot Device    : sifive_test
+Platform Shutdown Device  : sifive_test
+Firmware Base             : 0x80000000
+Firmware Size             : 252 KB
+Runtime SBI Version       : 0.3
+
+Domain0 Name              : root
+Domain0 Boot HART         : 0
+Domain0 HARTs             : 0*
+Domain0 Region00          : 0x0000000002000000-0x000000000200ffff (I)
+Domain0 Region01          : 0x0000000080000000-0x000000008003ffff ()
+Domain0 Region02          : 0x0000000000000000-0xffffffffffffffff (R,W,X)
+Domain0 Next Address      : 0x0000000080200000
+Domain0 Next Arg1         : 0x0000000087000000
+Domain0 Next Mode         : S-mode
+Domain0 SysReset          : yes
+
+Boot HART ID              : 0
+Boot HART Domain          : root
+Boot HART ISA             : rv64imafdcsuh
+Boot HART Features        : scounteren,mcounteren,time
+Boot HART PMP Count       : 16
+Boot HART PMP Granularity : 4
+Boot HART PMP Address Bits: 54
+Boot HART MHPM Count      : 0
+Boot HART MIDELEG         : 0x0000000000001666
+Boot HART MEDELEG         : 0x0000000000f0b509
+B isolated runtime fixture: manual PCBs; production B functions
+[B idle fallback and same-thread] PASS
+[B round-robin and blocked-state skip] PASS
+[B context registers and separate stacks] PASS
+[B Sv39 address-space switch] PASS
+[B interrupt-state restoration] PASS
+[B forkrets and first entry] PASS
+Breakpoint at 0x00000000802016c8
+Breakpoint at 0x00000000802016cc
+Illegal instruction at 0x00000000802016ce
+Illegal instruction at 0x00000000802016d2
+[B 16/32-bit trap return] PASS
+++ setup timer interrupts
+[B real timer interrupts] PASS
+[B cpu_idle dispatch] PASS
+MODULE B RUNTIME CHECK: PASS
+B_RUNTIME_CHECK: PASS (9 checks; full-lab grade pending)
