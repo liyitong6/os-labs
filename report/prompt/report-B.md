@@ -26,9 +26,9 @@ local_intr_save 读取 sstatus.SIE，原来开启时才关闭并返回真；loca
 - 独立 QEMU 运行九项通过，当前源码与运行日志中的哈希一致。
 - 准备阶段另有 15474 种主机模拟状态检查，与本机运行结果分别记录。
 
-[编译日志](local-b-compile.log)；[运行日志](local-b-runtime.log)。
+[编译日志](../materials/B/local-b-compile.log)；[运行日志](../materials/B/local-b-runtime.log)。
 
-![本机 B 专项运行日志截图](../../images/lab4-b-runtime-pass.png)
+![本机 B 专项运行日志截图](../images/lab4-b-runtime-pass.png)
 
 本专项使用手工构造的 PCB、页表和内核栈，直接运行 B 源码。正式 A/C 接口、整组启动及官方评分尚待合并验证。
 

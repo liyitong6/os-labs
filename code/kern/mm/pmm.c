@@ -281,7 +281,63 @@ struct Page *get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store)
     return NULL;
 }
 
-//LAB4 function1 YOUR CODE
+//LAB4 function1 2413646
+
+// Remove one leaf mapping; keep its page alive until the old TLB entry is gone.
+static void
+page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep)
+{
+    if (*ptep & PTE_V) {
+        struct Page *page = pte2page(*ptep);
+        *ptep = 0;
+        tlb_invalidate(pgdir, la);
+        if (page_ref_dec(page) == 0) {
+            free_page(page);
+        }
+    }
+}
+
+void
+page_remove(pde_t *pgdir, uintptr_t la)
+{
+    pte_t *ptep = get_pte(pgdir, la, 0);
+    if (ptep != NULL) {
+        page_remove_pte(pgdir, la, ptep);
+    }
+}
+
+int
+page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm)
+{
+    pde_t *root_entry = &pgdir[PDX1(la)];
+    pde_t old_root_entry = *root_entry;
+    pte_t *ptep = get_pte(pgdir, la, 1);
+    if (ptep == NULL) {
+        // get_pte may have created the first table before its second allocation
+        // failed. It is still empty, so return it and restore the original PDE.
+        if (!(old_root_entry & PTE_V) && (*root_entry & PTE_V)) {
+            struct Page *table = pde2page(*root_entry);
+            *root_entry = old_root_entry;
+            tlb_invalidate(pgdir, la);
+            if (page_ref_dec(table) == 0) {
+                free_page(table);
+            }
+        }
+        return -E_NO_MEM;
+    }
+
+    page_ref_inc(page);
+    if (*ptep & PTE_V) {
+        if (pte2page(*ptep) == page) {
+            page_ref_dec(page);
+        } else {
+            page_remove_pte(pgdir, la, ptep);
+        }
+    }
+    *ptep = pte_create(page2ppn(page), perm);
+    tlb_invalidate(pgdir, la);
+    return 0;
+}
 
 
 
@@ -295,7 +351,7 @@ void tlb_invalidate(pde_t *pgdir, uintptr_t la)
 {
     // flush_tlb();
     // The flush_tlb flush the entire TLB, is there any better way?
-    asm volatile("sfence.vma %0" : : "r"(la));
+    asm volatile("sfence.vma %0" : : "r"(la) : "memory");
 }
 
 static void check_alloc_page(void)
