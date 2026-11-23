@@ -123,17 +123,69 @@ TLB 同步沿用按地址执行的 `sfence.vma`，并在 `tlb_invalidate()` 中�
 
 ### 4.2 进程创建与初始化
 
-负责人：2413524-洪若曦。
+负责人：2413524-洪若曦。主要修改文件：`kern/process/proc.c`（标注 `LAB4 function2` 的位置）。完整提示词见 [prompt_A.md](./prompt/prompt_A.md)，完整个人报告见 [report_A.md](./prompt/report_A.md)。
 
-#### 模块功能描述
+#### 4.2.1 模块逻辑：两条创建线
 
-`alloc_proc()` 分配并初始化 PCB；`proc_init()` 将当前启动执行流包装为 `idleproc`，再经 `kernel_thread()` 创建 `initproc`。`kernel_thread()` 构造目标函数、参数及 S 态返回信息，`do_fork()` 依次装配 PCB、内核栈、地址空间和现场，再分配 PID、登记链表并唤醒线程。失败路径按资源获取的逆序清理。
+本模块解决“线程从哪里来、如何进入系统、如何第一次运行”，处在整体链路的 `proc_init` 段，并为后续 B 版块调度准备结构完整、可被选中的进程对象。内部按两条线理解：
 
-`copy_thread()` 将 trapframe 放到新栈顶部，令 `context.ra` 指向 `forkret`，`context.sp` 指向该 frame，并将 `tf->gpr.sp` 设为新线程内核栈顶，保证 `sret` 后 C 代码有可用栈。当前 `copy_mm()` 只确认内核线程无独立用户地址空间，不实现用户地址空间复制。
+1. **idleproc 线（pid=0）**：系统启动后当前这条执行流本身就是一个可运行内核线程，不需要“复制”产生，而是直接分配 PCB、复用启动栈，包装成第 0 个线程；
+2. **initproc 线（pid=1）**：启动初期没有父进程可复制，由 `kernel_thread` 手工构造中断帧，再经 `do_fork` 变成第一个真正的内核线程，首次执行目标是 `init_main`。
 
-#### 提示词
+`proc_init` 结束时系统至少存在 `idleproc`（pid=0）与 `initproc`（pid=1），且 `current` 指向 `idleproc`。
 
-完整提示词见 [prompt_A.md](./prompt/prompt_A.md).主要约定如下：
+#### 4.2.2 六个核心函数的理解
+
+交付 6 个函数，职责一览：
+
+| 函数 | 职责 |
+|---|---|
+| `alloc_proc` | 分配并清零 PCB，把各字段置于安全空白态 |
+| `proc_init` | 初始化链表/哈希，包装 idleproc，创建 initproc |
+| `kernel_thread` | 把函数入口+参数包装成首次运行所需中断帧 |
+| `do_fork` | 装配 PCB/内核栈/地址空间/现场，登记并唤醒 |
+| `copy_thread` | 在新栈顶安放中断帧、设置首次切换 context |
+| `copy_mm` | 内核线程地址空间占位，置 mm=NULL |
+
+逐个实现要点：
+
+- **alloc_proc**：`kmalloc` 后先 `memset` 整体清零，再显式置 `state=PROC_UNINIT`、`pid=-1`、各指针字段为空、`pgdir=boot_pgdir_pa`、两个链表节点 `list_init`。意义是杜绝未初始化字段被后续代码误用，干净确定的初始态是后续装配的安全基础；分配失败返回 NULL，无副作用。
+- **proc_init**：先初始化 `proc_list` 和每个哈希桶；`alloc_proc` 得到 idleproc，它不经过 fork，直接复用当前现场——`pid=0`、`PROC_RUNNABLE`、`kstack=bootstack`、`need_resched=1`，并令 `current` 指向它；再用 `kernel_thread(init_main, "Hello world!!", 0)` 创建 initproc，经 `find_proc` 取回并命名 “init”。关键对象分配失败直接 `panic`，不留半初始化子系统。
+- **kernel_thread**：在局部中断帧 `tf` 上手工造出陷入现场，清零后 `s0=fn`（函数入口）、`s1=arg`（参数）；`status` 读 `sstatus` 后置 `SPP`（返回 S 态）、`SPIE`（sret 后开中断）并清 `SIE`；`epc=kernel_thread_entry`；最后调 `do_fork(clone_flags | CLONE_VM, 0, &tf)`。
+- **do_fork**：按固定顺序 `alloc_proc → setup_kstack → copy_mm → copy_thread`，再在关中断临界区完成 `get_pid`、挂哈希表与进程链表、`nr_process++`，最后 `wakeup_proc` 并返回 pid。关中断是为防止链表修改与遍历链表的时钟中断并发；失败时通过 goto 阶梯按资源获取逆序清理。
+- **copy_thread**：`proc->tf = (struct trapframe *)(proc->kstack + KSTACKSIZE) - 1`，C 指针减 1 自动减去 `sizeof(trapframe)=288`，无需手算；复制中断帧，`a0=0`（子进程 fork 返回 0）、`gpr.sp=kstack+KSTACKSIZE`，并设 `context.sp=tf`、`context.ra=forkret`，使首次 switch_to 后经 `forkret → forkrets → __trapret` 恢复。
+- **copy_mm**：本阶段所有线程都是内核线程，`current->mm` 本就为 NULL，故仅 `assert(current->mm == NULL)` 确认前提，置 `proc->mm=NULL` 后返回；保留完整接口形态，方便后续实验扩展真正的地址空间复制。
+
+#### 4.2.3 三项配套任务
+
+**（1）衔接 Lab2 依赖。** A 建立在 Lab2 物理内存管理之上：`setup_kstack` 调 `alloc_pages` 分配内核栈、`page2kva` 取内核虚拟地址；清理路径 `put_kstack` 调 `kva2page` 与 `free_pages` 回收；新线程 `pgdir` 复用 `boot_pgdir_pa`。接口名、参数、返回值与工程真实定义一致。
+
+**（2）创建失败与资源清理测试。** goto 阶梯保证“占用了多少资源，失败时就释放多少”，清理路径与失败点对应如下：
+
+| 失败发生在 | 跳转标签 | 清理动作 |
+|---|---|---|
+| `alloc_proc` 失败 | `fork_out` | 尚未占用资源，返回 `-E_NO_MEM` |
+| `setup_kstack` 失败 | `bad_fork_cleanup_proc` | `kfree` 释放 PCB |
+| `copy_mm` 失败 | `bad_fork_cleanup_kstack` | 先 `put_kstack` 释放内核栈，再 `kfree` 释放 PCB |
+
+标签采用“穿透”写法：`bad_fork_cleanup_kstack` 执行完自然落入 `bad_fork_cleanup_proc`，保证每个失败点都按资源获取逆序完整释放，不产生内存泄漏或残留链表结构。
+
+**（3）PCB 与 PID 分配分析。**
+- **PCB 字段分类**：身份与生命周期（`state/pid/runs/flags/name`）、执行资源（`kstack/context/tf/pgdir`）、关系与调度（`parent/need_resched/mm`）、链表挂接点（`list_link` 挂全局进程链表、`hash_link` 挂 pid 哈希表）。`alloc_proc` 负责初始化到安全空白态，`do_fork` 再逐步填成可运行实体。
+- **get_pid 机制**：维护 `last_pid`（上一次分配值）与 `next_safe`（已存在 pid 中大于当前值的最小占用值）。分配时 `last_pid` 递增，只要仍小于 `next_safe` 就保证不与现有进程冲突；一旦达到 `next_safe`，重新扫描整个进程链表找出新的安全区间并跳过被占用的号。这种“惰性检查 + 冲突时重扫”既保证 pid 唯一，又避免每次分配都完整遍历链表。
+
+#### 4.2.4 spec 与 prompt 是怎么写的
+
+按 lab0.5 规范把需求规格（spec）与提示词（prompt）分开处理：
+
+- **spec（行为规格）**：只描述每个函数“需要满足什么行为”，而非“具体怎么实现”，统一使用 `Pre-Condition / Post-Condition / Case / Requirements` 字段，覆盖正常路径与资源不足分支。
+- **prompt（四段式，完整内容见 prompt_A.md）**：
+  - `[PROMPT]`：明确只改 `proc.c` 的 `LAB4 function2`，必须修改真实文件、不碰 B/C 留空区域；
+  - `[RELY]`：只放与本任务直接相关、且从工程真实代码核对过的宏、数据结构和可调用函数，遵循“最小、可信”原则；
+  - `[GUARANTEE]`：列出 6 个必须实现的函数签名作为交付清单；
+  - `[SPECIFICATION]`：逐函数给出行为规格。
+
+提示词粒度为“一个能独立完成一项功能的模块用一个提示词”，因此 6 个函数合在一份提示词里，而非一函数一份。主要约定精简如下：
 
 ```text
 [PROMPT]
