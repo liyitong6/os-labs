@@ -1,0 +1,72 @@
+Remote debugging using localhost:1234
+0x0000000000001000 in ?? ()
+Hardware assisted breakpoint 1 at 0x8004a6: file /home/liyitong/oslab/lab5_B_work/user/libs/syscall.c, line 54.
+Continuing.
+
+Breakpoint 1, sys_putc (c=c@entry=85) at /home/liyitong/oslab/lab5_B_work/user/libs/syscall.c:54
+54	    return syscall(SYS_putc, (uintptr_t)c, 0, 0, 0, 0);
+Continuing.
+Remote connection closed
+Remote debugging using localhost:1234
+0x0000000000001000 in ?? ()
+Hardware assisted breakpoint 2 at 0x8004a6: file /home/liyitong/oslab/lab5_B_work/user/libs/syscall.c, line 54.
+Continuing.
+
+Breakpoint 2, sys_putc (c=c@entry=85) at /home/liyitong/oslab/lab5_B_work/user/libs/syscall.c:54
+54	    return syscall(SYS_putc, (uintptr_t)c, 0, 0, 0, 0);
+=> 0x8004a6 <sys_putc>:	mv	a1,a0
+   0x8004a8 <sys_putc+2>:	li	a2,0
+   0x8004aa <sys_putc+4>:	li	a0,30
+   0x8004ac <sys_putc+6>:	li	a3,0
+   0x8004ae <sys_putc+8>:	li	a4,0
+   0x8004b0 <sys_putc+10>:	li	a5,0
+   0x8004b2 <sys_putc+12>:	ecall
+   0x8004b6 <sys_putc+16>:	sext.w	a0,a0
+   0x8004b8 <sys_putc+18>:	ret
+   0x8004ba <sys_pgdir>:	li	a0,31
+   0x8004bc <sys_pgdir+2>:	li	a1,0
+   0x8004be <sys_pgdir+4>:	li	a2,0
+Hardware assisted breakpoint 3 at 0x8004b2: file /home/liyitong/oslab/lab5_B_work/user/libs/syscall.c, line 18.
+Continuing.
+
+Temporary breakpoint 3, syscall (number=30, p0=85, p1=0, p2=0, p3=0, p4=0) at /home/liyitong/oslab/lab5_B_work/user/libs/syscall.c:18
+18	    asm volatile ("ecall"
+=> 0x8004b2 <sys_putc+12>:	ecall
+pc             0x8004b2	0x8004b2 <sys_putc+12>
+sp             0x1001fd0	0x1001fd0
+a0             0x1e	30
+a1             0x55	85
+a2             0x0	0
+a3             0x0	0
+a4             0x0	0
+a5             0x0	0
+__alltraps () at /home/liyitong/oslab/lab5_B_work/kern/trap/trapentry.S:123
+123	    SAVE_ALL
+Hardware assisted breakpoint 4 at 0x802021b8: file /home/liyitong/oslab/lab5_B_work/kern/syscall/syscall.c, line 86.
+Continuing.
+
+Temporary breakpoint 4, syscall () at /home/liyitong/oslab/lab5_B_work/kern/syscall/syscall.c:86
+86	    assert(current != NULL && current->tf != NULL);
+$1 = 30
+$2 = 85
+$3 = 0x8004b6
+Hardware assisted breakpoint 5 at 0x8020204e: file /home/liyitong/oslab/lab5_B_work/kern/trap/trapentry.S, line 136.
+Continuing.
+
+Temporary breakpoint 5, __lab5_sret () at /home/liyitong/oslab/lab5_B_work/kern/trap/trapentry.S:136
+136	    sret
+=> 0x8020204e <__lab5_sret>:	sret
+=> 0x8020204e <__lab5_sret>:	sret
+pc             0x8020204e	0x8020204e <__lab5_sret>
+sp             0x1001fd0	0x1001fd0
+a0             0x0	0
+sepc           0x8004b6	8389814
+sstatus        0x200040020	8590196768
+sys_putc (c=c@entry=85) at /home/liyitong/oslab/lab5_B_work/user/libs/syscall.c:22
+22	    return (int)(intptr_t)a0;
+=> 0x8004b6 <sys_putc+16>:	sext.w	a0,a0
+pc             0x8004b6	0x8004b6 <sys_putc+16>
+sp             0x1001fd0	0x1001fd0
+a0             0x0	0
+Continuing.
+Remote connection closed

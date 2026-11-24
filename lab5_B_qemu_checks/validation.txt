@@ -1,0 +1,17 @@
+PASS host C syntax with fixture bindings: kernel.c
+PASS host C syntax with fixture bindings: proc_b.c
+PASS host C syntax with fixture bindings: trap.c
+PASS host C syntax with fixture bindings: syscall.c
+PASS host C syntax with fixture bindings: sched.c
+PASS host C syntax with fixture bindings: cow.c
+PASS host C syntax with fixture bindings: string.c
+SCOPE: framework printfmt.c uses the target va_list ABI; it awaits RISC-V compilation, not an x86_64 ABI type check.
+PASS host C syntax: user.c
+PASS assembly preprocessing: entry.S
+PASS assembly preprocessing: user.S
+PASS assembly preprocessing: trapentry.S
+PASS assembly preprocessing: switch.S
+PASS assembly preprocessing: image.S
+PASS runner build-plan generation and B-only proc extraction
+PASS original project unchanged
+PENDING: actual RISC-V compilation and QEMU runtime of this new fixture

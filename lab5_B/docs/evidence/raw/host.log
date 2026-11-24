@@ -1,0 +1,131 @@
+Starting program: /opt/qemu/bin/qemu-system-riscv64 -machine virt -cpu rv64 -smp 1 -m 128M -nographic -monitor none -bios default -kernel /home/liyitong/oslab/lab5_B_package/lab5_B_qemu_checks/build/kernel.elf -s -S -no-reboot
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+[New Thread 0x7ffff75ff640 (LWP 876)]
+[New Thread 0x7ffff6bb9640 (LWP 877)]
+[Thread 0x7ffff6bb9640 (LWP 877) exited]
+[Thread 0x7ffff75ff640 (LWP 876) exited]
+[Inferior 1 (process 873) exited normally]
+Starting program: /opt/qemu/bin/qemu-system-riscv64 -machine virt -cpu rv64 -smp 1 -m 128M -nographic -monitor none -bios default -kernel /home/liyitong/oslab/lab5_B_package/lab5_B_qemu_checks/build/kernel.elf -s -S -no-reboot
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+[New Thread 0x7ffff75ff640 (LWP 916)]
+[New Thread 0x7ffff6bb9640 (LWP 917)]
+
+Thread 1 "qemu-system-ris" received signal SIGINT, Interrupt.
+0x00007ffff7718d9e in __ppoll (fds=0x555556bc2cc0, nfds=5, timeout=<optimized out>, timeout@entry=0x7fffffffdae0, sigmask=sigmask@entry=0x0) at ../sysdeps/unix/sysv/linux/ppoll.c:42
+42	../sysdeps/unix/sysv/linux/ppoll.c: No such file or directory.
+Breakpoint 1 at 0x555555a0e6e0: file ../target/riscv/cpu_helper.c, line 1328.
+Continuing.
+[Switching to Thread 0x7ffff6bb9640 (LWP 917)]
+
+Thread 3 "qemu-system-ris" hit Breakpoint 1, riscv_cpu_do_interrupt (cs=0x5555566d98b0) at ../target/riscv/cpu_helper.c:1328
+1328	{
+cs = 0x5555566d98b0
+#0  riscv_cpu_do_interrupt (cs=0x5555566d98b0) at ../target/riscv/cpu_helper.c:1328
+#1  0x0000555555b60a7a in cpu_handle_exception (ret=<synthetic pointer>, cpu=0x5555566d98b0) at ../accel/tcg/cpu-exec.c:681
+#2  cpu_exec (cpu=cpu@entry=0x5555566d98b0) at ../accel/tcg/cpu-exec.c:949
+#3  0x0000555555b7a544 in tcg_cpus_exec (cpu=cpu@entry=0x5555566d98b0) at ../accel/tcg/tcg-accel-ops.c:68
+#4  0x0000555555b7a697 in mttcg_cpu_thread_fn (arg=arg@entry=0x5555566d98b0) at ../accel/tcg/tcg-accel-ops-mttcg.c:96
+#5  0x0000555555ce5591 in qemu_thread_start (args=<optimized out>) at ../util/qemu-thread-posix.c:556
+(More stack frames follow...)
+1323	 *
+1324	 * Adapted from Spike's processor_t::take_trap.
+1325	 *
+1326	 */
+1327	void riscv_cpu_do_interrupt(CPUState *cs)
+1328	{
+1329	#if !defined(CONFIG_USER_ONLY)
+1330	
+1331	    RISCVCPU *cpu = RISCV_CPU(cs);
+1332	    CPURISCVState *env = &cpu->env;
+A syntax error in expression, near `set $rv = &((RISCVCPU *)cs)->env
+p/d $rv->priv
+p/x $rv->pc'.
+1333	    bool write_gva = false;
+1334	    uint64_t s;
+1335	
+1336	    /* cs->exception is 32-bits wide unlike mcause which is XLEN-bits wide
+1337	     * so we mask off the MSB and separate into trap type and cause.
+1338	     */
+1339	    bool async = !!(cs->exception_index & RISCV_EXCP_INT_FLAG);
+1340	    target_ulong cause = cs->exception_index & RISCV_EXCP_INT_MASK;
+1341	    uint64_t deleg = async ? env->mideleg : env->medeleg;
+1342	    target_ulong tval = 0;
+1343	    target_ulong htval = 0;
+1344	    target_ulong mtval2 = 0;
+1345	
+1346	    if  (cause == RISCV_EXCP_SEMIHOST) {
+1347	        if (env->priv >= PRV_S) {
+1348	            env->gpr[xA0] = do_common_semihosting(cs);
+1349	            env->pc += 4;
+1350	            return;
+1351	        }
+1352	        cause = RISCV_EXCP_BREAKPOINT;
+1353	    }
+1354	
+1355	    if (!async) {
+1356	        /* set tval to badaddr for traps with address information */
+1357	        switch (cause) {
+1358	        case RISCV_EXCP_INST_GUEST_PAGE_FAULT:
+1359	        case RISCV_EXCP_LOAD_GUEST_ACCESS_FAULT:
+1360	        case RISCV_EXCP_STORE_GUEST_AMO_ACCESS_FAULT:
+1361	        case RISCV_EXCP_INST_ADDR_MIS:
+1362	        case RISCV_EXCP_INST_ACCESS_FAULT:
+1363	        case RISCV_EXCP_LOAD_ADDR_MIS:
+1364	        case RISCV_EXCP_STORE_AMO_ADDR_MIS:
+1365	        case RISCV_EXCP_LOAD_ACCESS_FAULT:
+$1 = 8
+$2 = 0
+$3 = 0x8004b2
+#0  riscv_cpu_do_interrupt (cs=0x5555566d98b0) at ../target/riscv/cpu_helper.c:1328
+#1  0x0000555555b60a7a in cpu_handle_exception (ret=<synthetic pointer>, cpu=0x5555566d98b0) at ../accel/tcg/cpu-exec.c:681
+#2  cpu_exec (cpu=cpu@entry=0x5555566d98b0) at ../accel/tcg/cpu-exec.c:949
+(More stack frames follow...)
+$4 = 8
+$5 = 0
+$6 = 0x8004b2
+Run till exit from #0  riscv_cpu_do_interrupt (cs=0x5555566d98b0) at ../target/riscv/cpu_helper.c:1328
+cpu_handle_exception (ret=<synthetic pointer>, cpu=0x5555566d98b0) at ../accel/tcg/cpu-exec.c:682
+682	            qemu_mutex_unlock_iothread();
+$7 = 1
+$8 = 0x8004b2
+$9 = 0x8
+$10 = 0x80201f80
+$11 = 0x80201f80
+$12 = 0xa000400a0
+Continuing.
+
+Thread 1 "qemu-system-ris" received signal SIGINT, Interrupt.
+[Switching to Thread 0x7ffff782dbc0 (LWP 915)]
+0x00007ffff7718d9e in __ppoll (fds=0x555556bc2cc0, nfds=5, timeout=<optimized out>, timeout@entry=0x7fffffffdae0, sigmask=sigmask@entry=0x0) at ../sysdeps/unix/sysv/linux/ppoll.c:42
+42	../sysdeps/unix/sysv/linux/ppoll.c: No such file or directory.
+Breakpoint 2 at 0x555555a16f40: file ../target/riscv/op_helper.c, line 120.
+Continuing.
+[Switching to Thread 0x7ffff6bb9640 (LWP 917)]
+
+Thread 3 "qemu-system-ris" hit Breakpoint 2, helper_sret (env=0x5555566e2a30) at ../target/riscv/op_helper.c:120
+120	{
+env = 0x5555566e2a30
+$13 = 1
+$14 = 0x8004b6
+$15 = 0xa000400a0
+Run till exit from #0  helper_sret (env=0x5555566e2a30) at ../target/riscv/op_helper.c:120
+0x00007fffb323c114 in code_gen_buffer ()
+Value returned is $16 = 8389814
+$17 = 0
+$18 = 0xa000400a2
+Continuing.
+[Thread 0x7ffff6bb9640 (LWP 917) exited]
+[Thread 0x7ffff75ff640 (LWP 916) exited]
+[Inferior 1 (process 915) exited normally]
+Line 24 of "../target/riscv/insn_trans/trans_privileged.c.inc" starts at address 0x555555a89c8c <decode_insn32+56828> and ends at 0x555555a89c91 <decode_insn32+56833>.
+Line 114 of "../target/riscv/translate.c" starts at address 0x555555a89dc0 <decode_insn32+57136> and ends at 0x555555a89dca <decode_insn32+57146>.
+Current source file is ../target/riscv/op_helper.c
+Compilation directory is /home/liyitong/qemu-7.0.0/build
+Located in /home/liyitong/qemu-7.0.0/target/riscv/op_helper.c
+Contains 295 lines.
+Source language is c.
+Producer is GNU C11 11.4.0 -m64 -mcx16 -mtune=generic -march=x86-64 -g -O2 -std=gnu11 -fno-strict-aliasing -fno-common -fwrapv -fstack-protector-strong -fPIE -fasynchronous-unwind-tables -fstack-protector-strong -fstack-clash-protection -fcf-protection.
+Compiled with DWARF 5 debugging format.
+Does not include preprocessor macro info.

@@ -1,0 +1,20 @@
+{
+  "prior_user_reported": {
+    "distribution": "Ubuntu-22.04",
+    "riscv_translation_units": 8,
+    "host_assertions": 5434,
+    "scheduler_scenarios": 896,
+    "assembly_semantic_scenarios": 500,
+    "installer_tests": 7,
+    "debug_preparation_tests": 3,
+    "qemu_version": "7.0.0",
+    "gdb_version": "16.3.90.20250610-git"
+  },
+  "new_fixture_riscv_build": "passed on user WSL Ubuntu-22.04",
+  "new_fixture_qemu_runtime": "passed on user QEMU 7.0.0; 11/11 checkpoints",
+  "full_lab5_grade": "not performed; outside this B fixture",
+  "dual_gdb_runtime": "completed SYS_putc U/S/U trace with actual guest return and normal QEMU exit",
+  "evidence": "../lab5_B/docs/evidence",
+  "debug_script_generator_regressions": 2,
+  "latest_script_generation_only": "Native-command generator regression checked locally; user completed equivalent native commands manually; updated generated script not reexecuted in target GDB"
+}

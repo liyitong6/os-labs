@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <unistd.h>
 
 /* ------------- process/thread mechanism design&implementation -------------
 (an simplified Linux process/thread mechanism )
@@ -81,6 +82,73 @@ void kernel_thread_entry(void);
 void forkrets(struct trapframe *tf);
 void switch_to(struct context *from, struct context *to);
 
+//lab4 请补充你在lab4中的代码
+/* BEGIN LAB5 B: 2412933 */
+void cpu_idle(void) {
+    //lab4 dependency 2412933
+    for (;;) {
+        if (current->need_resched) {
+            schedule();
+        }
+    }
+}
+
+void proc_run(struct proc_struct *proc) {
+    //lab4 dependency 2412933
+    assert(proc != NULL && current != NULL);
+    assert(proc->state == PROC_RUNNABLE);
+    if (proc != current) {
+        bool intr_flag;
+        local_intr_save(intr_flag);
+        struct proc_struct *prev = current;
+        current = proc;
+        asm volatile ("" ::: "memory");
+        uintptr_t target_satp = ((uintptr_t)SATP_MODE_SV39 << 60) |
+                                (proc->pgdir >> RISCV_PGSHIFT);
+        write_csr(satp, target_satp);
+        flush_tlb();
+        asm volatile ("" ::: "memory");
+        switch_to(&prev->context, &proc->context);
+        local_intr_restore(intr_flag);
+    }
+}
+
+int do_yield(void) {
+    //lab5 function4 2412933
+    assert(current != NULL);
+    current->need_resched = 1;
+    /* trap() schedules after the syscall; injected tests also require this. */
+    return 0;
+}
+
+int do_kill(int pid) {
+    //lab5 function4 2412933
+    bool intr_flag;
+    int result = -E_INVAL;
+    local_intr_save(intr_flag);
+    struct proc_struct *proc = find_proc(pid);
+    if (proc != NULL && proc != idleproc && proc != initproc &&
+        proc->state != PROC_UNINIT && proc->state != PROC_ZOMBIE) {
+        if (proc->flags & PF_EXITING) {
+            result = -E_KILLED;
+        } else {
+            proc->flags |= PF_EXITING;
+            if (proc->state == PROC_SLEEPING &&
+                (proc->wait_state & WT_INTERRUPTED)) {
+                wakeup_proc(proc);
+            }
+            result = 0;
+        }
+    }
+    local_intr_restore(intr_flag);
+    return result;
+}
+/* END LAB5 B */
+
+
+//lab5 function2 YOUR CODE update alloc_proc
+
+
 // set_proc_name - set the name of proc
 char *
 set_proc_name(struct proc_struct *proc, const char *name)
@@ -96,6 +164,40 @@ get_proc_name(struct proc_struct *proc)
     static char name[PROC_NAME_LEN + 1];
     memset(name, 0, sizeof(name));
     return memcpy(name, proc->name, PROC_NAME_LEN);
+}
+
+// set_links - set the relation links of process
+static void
+set_links(struct proc_struct *proc)
+{
+    list_add(&proc_list, &(proc->list_link));
+    proc->yptr = NULL;
+    if ((proc->optr = proc->parent->cptr) != NULL)
+    {
+        proc->optr->yptr = proc;
+    }
+    proc->parent->cptr = proc;
+    nr_process++;
+}
+
+// remove_links - clean the relation links of process
+static void
+remove_links(struct proc_struct *proc)
+{
+    list_del(&(proc->list_link));
+    if (proc->optr != NULL)
+    {
+        proc->optr->yptr = proc->yptr;
+    }
+    if (proc->yptr != NULL)
+    {
+        proc->yptr->optr = proc->optr;
+    }
+    else
+    {
+        proc->parent->cptr = proc->optr;
+    }
+    nr_process--;
 }
 
 // get_pid - alloc a unique pid for process
@@ -142,6 +244,10 @@ get_pid(void)
 }
 
 
+
+
+
+
 // forkret -- the first kernel entry point of a new thread/process
 // NOTE: the addr of forkret is setted in copy_thread function
 //       after switch_to, the current proc will execute here.
@@ -156,6 +262,13 @@ static void
 hash_proc(struct proc_struct *proc)
 {
     list_add(hash_list + pid_hashfn(proc->pid), &(proc->hash_link));
+}
+
+// unhash_proc - delete proc from proc hash_list
+static void
+unhash_proc(struct proc_struct *proc)
+{
+    list_del(&(proc->hash_link));
 }
 
 // find_proc - find proc frome proc hash_list according to pid
@@ -176,6 +289,8 @@ find_proc(int pid)
     }
     return NULL;
 }
+
+//lab5 function2 YOUR CODE update kernel_thread
 
 
 // setup_kstack - alloc pages with size KSTACKPAGE as process kernel stack
@@ -198,253 +313,64 @@ put_kstack(struct proc_struct *proc)
     free_pages(kva2page((void *)(proc->kstack)), KSTACKPAGE);
 }
 
-
-// do_exit - called by sys_exit
-//   1. call exit_mmap & put_pgdir & mm_destroy to free the almost all memory space of process
-//   2. set process' state as PROC_ZOMBIE, then call wakeup_proc(parent) to ask parent reclaim itself.
-//   3. call scheduler to switch to other process
-int do_exit(int error_code)
-{
-    panic("process exit!!.\n");
-}
-
-// init_main - the second kernel thread used to create user_main kernel threads
+// setup_pgdir - alloc one page as PDT
 static int
-init_main(void *arg)
+setup_pgdir(struct mm_struct *mm)
 {
-    cprintf("this initproc, pid = %d, name = \"%s\"\n", current->pid, get_proc_name(current));
-    cprintf("To U: \"%s\".\n", (const char *)arg);
-    cprintf("To U: \"en.., Bye, Bye. :)\"\n");
-    return 0;
-}
-
-//LAB4 function2 2413524
-
-// alloc_proc - allocate a PCB and put every field into a safe, known state.
-// A zeroed block plus explicit initial values guarantees that no later code
-// can observe an uninitialized field (stale pointer, garbage flags, etc.).
-static struct proc_struct *
-alloc_proc(void)
-{
-    struct proc_struct *proc = kmalloc(sizeof(struct proc_struct));
-    if (proc != NULL)
+    struct Page *page;
+    if ((page = alloc_page()) == NULL)
     {
-        // Zero the whole block first so every field and padding start clean.
-        memset(proc, 0, sizeof(struct proc_struct));
-
-        proc->state = PROC_UNINIT; // newly created, not yet registered
-        proc->pid = -1;            // no identity assigned yet
-        proc->runs = 0;
-        proc->kstack = 0;
-        proc->need_resched = 0;
-        proc->parent = NULL;
-        proc->mm = NULL;
-        proc->tf = NULL;
-        // Kernel threads share the boot page table; pgdir holds its physical
-        // address because satp expects a physical page number.
-        proc->pgdir = boot_pgdir_pa;
-        proc->flags = 0;
-        // context and name are already zero after memset; reset them again
-        // explicitly to make the intent obvious.
-        memset(&proc->context, 0, sizeof(struct context));
-        memset(proc->name, 0, sizeof(proc->name));
-        list_init(&proc->list_link);
-        list_init(&proc->hash_link);
+        return -E_NO_MEM;
     }
-    return proc;
-}
+    pde_t *pgdir = page2kva(page);
+    memcpy(pgdir, boot_pgdir_va, PGSIZE);
 
-// copy_mm - placeholder for user address-space handling. In lab4 every thread
-// is a kernel thread: current->mm is NULL and there is nothing to copy.
-static int
-copy_mm(uint32_t clone_flags, struct proc_struct *proc)
-{
-    assert(current->mm == NULL);
-    proc->mm = NULL;
+    mm->pgdir = pgdir;
     return 0;
 }
 
-// copy_thread - place the trap frame at the top of the new kernel stack and
-// wire the callee-saved context so the first switch_to lands on forkret.
+// put_pgdir - free the memory space of PDT
 static void
-copy_thread(struct proc_struct *proc, uintptr_t esp, struct trapframe *tf)
+put_pgdir(struct mm_struct *mm)
 {
-    // Reserve one trap frame at the highest addresses of the kernel stack.
-    proc->tf = (struct trapframe *)(proc->kstack + KSTACKSIZE) - 1;
-    *(proc->tf) = *tf;
-
-    // A freshly forked child reports 0 as its fork return value.
-    proc->tf->gpr.a0 = 0;
-
-    // After RESTORE_ALL, sret jumps to kernel_thread_entry and the CPU runs
-    // ordinary kernel C code, which needs a valid (callee-saved) stack. Point
-    // the trap frame's sp at the top of this thread's kernel stack; the trap
-    // frame itself has already been consumed by then and may be overwritten.
-    proc->tf->gpr.sp = proc->kstack + KSTACKSIZE;
-
-    // After switch_to restores this context, sp points at the trap frame and
-    // ret jumps to forkret, which runs forkrets(current->tf) -> __trapret.
-    proc->context.sp = (uintptr_t)(proc->tf);
-    proc->context.ra = (uintptr_t)forkret;
+    free_page(kva2page(mm->pgdir));
 }
 
-// do_fork - the core thread creation routine. It assembles PCB, kernel stack,
-// address space, trap frame and context, then registers the new thread under a
-// pid and wakes it. A failure before registration releases exactly the
-// resources already acquired through the goto-based cleanup ladder.
-int
-do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf)
-{
-    int ret = -E_NO_MEM;
-    struct proc_struct *proc;
-
-    // 1. Allocate a PCB.
-    if ((proc = alloc_proc()) == NULL)
-    {
-        goto fork_out;
-    }
-    proc->parent = current;
-
-    // 2. Allocate the kernel stack.
-    if (setup_kstack(proc) != 0)
-    {
-        goto bad_fork_cleanup_proc;
-    }
-
-    // 3. Handle (share) the address space.
-    if (copy_mm(clone_flags, proc) != 0)
-    {
-        goto bad_fork_cleanup_kstack;
-    }
-
-    // 4. Build trap frame and switch context.
-    copy_thread(proc, stack, tf);
-
-    // 5-6. Register the thread: pid, hash list, global list, counter.
-    // Interrupts are disabled so the list mutation cannot race with a timer
-    // interrupt that walks proc_list.
-    bool intr_flag;
-    local_intr_save(intr_flag);
-    {
-        proc->pid = get_pid();
-        hash_proc(proc);
-        list_add(&proc_list, &proc->list_link);
-        nr_process++;
-    }
-    local_intr_restore(intr_flag);
-
-    // 7. Make it runnable and return its pid.
-    wakeup_proc(proc);
-    ret = proc->pid;
-
-fork_out:
-    return ret;
-
-bad_fork_cleanup_kstack:
-    put_kstack(proc);
-bad_fork_cleanup_proc:
-    kfree(proc);
-    goto fork_out;
-}
-
-// kernel_thread - package an ordinary kernel function (fn/arg) into a trap
-// frame that looks like a trap taken from supervisor mode, then ask do_fork to
-// build a runnable thread from it.
-int
-kernel_thread(int (*fn)(void *), void *arg, uint32_t clone_flags)
-{
-    struct trapframe tf;
-    memset(&tf, 0, sizeof(struct trapframe));
-
-    // kernel_thread_entry reads s0 = target function and s1 = its argument.
-    tf.gpr.s0 = (uintptr_t)fn;
-    tf.gpr.s1 = (uintptr_t)arg;
-
-    // SPP=1: return to supervisor mode; SPIE=1: keep interrupts enabled after
-    // sret; SIE=0: interrupts stay off while the thread is being assembled.
-    tf.status = (read_csr(sstatus) | SSTATUS_SPP | SSTATUS_SPIE)
-                & ~SSTATUS_SIE;
-    // First-run entry point; it calls fn through s0/s1.
-    tf.epc = (uintptr_t)kernel_thread_entry;
-
-    return do_fork(clone_flags | CLONE_VM, 0, &tf);
-}
-
-// proc_init - bring up the process subsystem. The current execution context
-// (running since entry.S) is wrapped into the 0th kernel thread "idleproc",
-// then the first real kernel thread "initproc" is created via
-// kernel_thread(init_main, ...).
-void
-proc_init(void)
-{
-    // Initialize the global PCB list and every hash bucket.
-    list_init(&proc_list);
-    for (int i = 0; i < HASH_LIST_SIZE; i++)
-    {
-        list_init(hash_list + i);
-    }
-
-    if ((idleproc = alloc_proc()) == NULL)
-    {
-        panic("cannot alloc idleproc.\n");
-    }
-
-    // idleproc is not forked: it reuses the boot context and stack directly.
-    idleproc->pid = 0;
-    idleproc->state = PROC_RUNNABLE;
-    idleproc->kstack = (uintptr_t)bootstack;
-    idleproc->need_resched = 1; // ask the scheduler to run initproc ASAP
-    set_proc_name(idleproc, "idle");
-    nr_process++;
-
-    current = idleproc;
-
-    // Create the first real kernel thread; its pid must be positive.
-    int pid = kernel_thread(init_main, "Hello world!!", 0);
-    if (pid <= 0)
-    {
-        panic("create init_main failed.\n");
-    }
-
-    initproc = find_proc(pid);
-    set_proc_name(initproc, "init");
-
-    assert(idleproc != NULL && idleproc->pid == 0);
-    assert(initproc != NULL && initproc->pid == 1);
-    assert(initproc->parent == idleproc);
-}
+//lab5 function3 YOUR CODE update copy_mm
 
 
-//LAB4 function3 2412933
 
-void
-cpu_idle(void)
-{
-    for (;;) {
-        if (current->need_resched) {
-            schedule();
-        }
-    }
-}
+//lab5 function2 YOUR CODE
 
-void
-proc_run(struct proc_struct *proc)
-{
-    assert(proc != NULL && current != NULL);
-    assert(proc->state == PROC_RUNNABLE);
-    if (proc != current) {
-        bool intr_flag;
-        local_intr_save(intr_flag);
-        struct proc_struct *prev = current;
-        current = proc;
-        asm volatile ("" ::: "memory");
-        uintptr_t satp = ((uintptr_t)SATP_MODE_SV39 << 60)
-                       | (proc->pgdir >> RISCV_PGSHIFT);
-        write_csr(satp, satp);
-        flush_tlb();
-        asm volatile ("" ::: "memory");
-        switch_to(&prev->context, &proc->context);
-        local_intr_restore(intr_flag);
-    }
-}
+
+//lab5 function3 YOUR CODE
+
+
+//lab5 function4 YOUR CODE
+
+
+#define __KERNEL_EXECVE(name, binary, size) ({           \
+    cprintf("kernel_execve: pid = %d, name = \"%s\".\n", \
+            current->pid, name);                         \
+    kernel_execve(name, binary, (size_t)(size));         \
+})
+
+#define KERNEL_EXECVE(x) ({                                    \
+    extern unsigned char _binary_obj___user_##x##_out_start[], \
+        _binary_obj___user_##x##_out_size[];                   \
+    __KERNEL_EXECVE(#x, _binary_obj___user_##x##_out_start,    \
+                    _binary_obj___user_##x##_out_size);        \
+})
+
+#define __KERNEL_EXECVE2(x, xstart, xsize) ({   \
+    extern unsigned char xstart[], xsize[];     \
+    __KERNEL_EXECVE(#x, xstart, (size_t)xsize); \
+})
+
+#define KERNEL_EXECVE2(x, xstart, xsize) __KERNEL_EXECVE2(x, xstart, xsize)
+
+
+//lab5 function2 YOUR CODE
+
+
 

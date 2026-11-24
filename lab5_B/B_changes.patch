@@ -1,0 +1,671 @@
+--- /dev/null
++++ b/kern/mm/cow.c
+@@ -0,0 +1,90 @@
++#include <cow.h>
++#include <vmm.h>
++#include <pmm.h>
++#include <sync.h>
++#include <string.h>
++#include <error.h>
++
++//lab5 challenge B write-fault handler 2412933
++/* The supplied virt configuration is single-hart. Interrupt exclusion protects
++ * local PTE/refcount updates; it is not an SMP locking implementation.
++ */
++int cow_resolve_write(struct mm_struct *mm, uintptr_t addr) {
++    bool intr_flag;
++    int result = -E_INVAL;
++    local_intr_save(intr_flag);
++    if (mm == NULL || mm->pgdir == NULL || addr < USERBASE || addr >= USERTOP ||
++        !user_mem_check(mm, addr, 1, 1)) {
++        goto out;
++    }
++    pte_t *ptep = get_pte(mm->pgdir, addr, 0);
++    if (ptep == NULL ||
++        (*ptep & (PTE_V | PTE_U | PTE_R | PTE_COW)) !=
++                     (PTE_V | PTE_U | PTE_R | PTE_COW) ||
++        (*ptep & PTE_W)) {
++        goto out;
++    }
++    struct Page *old_page = pte2page(*ptep);
++    int refs = page_ref(old_page);
++    if (refs <= 0) {
++        goto out;
++    }
++    uintptr_t page_addr = ROUNDDOWN(addr, PGSIZE);
++    if (refs == 1) {
++        *ptep = (*ptep | PTE_W | PTE_A | PTE_D) & ~(pte_t)PTE_COW;
++        tlb_invalidate(mm->pgdir, page_addr);
++        result = 0;
++        goto out;
++    }
++    struct Page *new_page = alloc_page();
++    if (new_page == NULL) {
++        result = -E_NO_MEM;
++        goto out;
++    }
++    set_page_ref(new_page, 0);
++    memcpy(page2kva(new_page), page2kva(old_page), PGSIZE);
++    uint32_t perm = ((*ptep & 0x3ff) | PTE_W | PTE_A | PTE_D) & ~PTE_COW;
++    /* page_insert must atomically replace the mapping, adjust both refs and
++     * invalidate the translation; on failure it must leave the old map intact.
++     */
++    result = page_insert(mm->pgdir, new_page, page_addr, perm);
++    if (result != 0) {
++        free_page(new_page);
++    }
++out:
++    local_intr_restore(intr_flag);
++    return result;
++}
++
++int cow_prepare_write(struct mm_struct *mm, uintptr_t addr, size_t len) {
++    if (len == 0) {
++        return 0;
++    }
++    if (mm == NULL || mm->pgdir == NULL || addr < USERBASE || addr >= USERTOP ||
++        len > USERTOP - addr || !user_mem_check(mm, addr, len, 1)) {
++        return -E_INVAL;
++    }
++    bool intr_flag;
++    int result = 0;
++    local_intr_save(intr_flag);
++    uintptr_t end = addr + len;
++    for (uintptr_t va = ROUNDDOWN(addr, PGSIZE); va < end; va += PGSIZE) {
++        pte_t *ptep = get_pte(mm->pgdir, va, 0);
++        if (ptep == NULL || (*ptep & (PTE_V | PTE_U | PTE_R)) !=
++                                   (PTE_V | PTE_U | PTE_R)) {
++            result = -E_INVAL;
++            break;
++        }
++        if (*ptep & PTE_COW) {
++            result = cow_resolve_write(mm, va < addr ? addr : va);
++            if (result != 0) {
++                break;
++            }
++        } else if (!(*ptep & PTE_W)) {
++            result = -E_INVAL;
++            break;
++        }
++    }
++    local_intr_restore(intr_flag);
++    return result;
++}
+--- /dev/null
++++ b/kern/mm/cow.h
+@@ -0,0 +1,25 @@
++#ifndef __KERN_MM_COW_H__
++#define __KERN_MM_COW_H__
++
++#include <defs.h>
++
++//lab5 challenge B/C contract 2412933
++/* Sv39 RSW bit 8: only an originally writable user mapping may set this bit. */
++#ifndef PTE_COW
++#define PTE_COW 0x100
++#elif PTE_COW != 0x100
++#error "B/C must agree on PTE_COW = Sv39 RSW bit 8 (0x100)"
++#endif
++
++struct mm_struct;
++
++/* Resolve one COW store fault. Do not advance sepc; the store must retry. */
++int cow_resolve_write(struct mm_struct *mm, uintptr_t addr);
++
++/* Before a kernel write to user memory; 0 on success, negative error on failure.
++ * On a later-page failure, earlier pages may already be private, but no bytes
++ * are written by this helper. Callers must not memcpy unless it returns 0.
++ */
++int cow_prepare_write(struct mm_struct *mm, uintptr_t addr, size_t len);
++
++#endif
+--- a/kern/process/proc.c
++++ b/kern/process/proc.c
+@@ -83,6 +83,68 @@
+ void switch_to(struct context *from, struct context *to);
+ 
+ //lab4 请补充你在lab4中的代码
++/* BEGIN LAB5 B: 2412933 */
++void cpu_idle(void) {
++    //lab4 dependency 2412933
++    for (;;) {
++        if (current->need_resched) {
++            schedule();
++        }
++    }
++}
++
++void proc_run(struct proc_struct *proc) {
++    //lab4 dependency 2412933
++    assert(proc != NULL && current != NULL);
++    assert(proc->state == PROC_RUNNABLE);
++    if (proc != current) {
++        bool intr_flag;
++        local_intr_save(intr_flag);
++        struct proc_struct *prev = current;
++        current = proc;
++        asm volatile ("" ::: "memory");
++        uintptr_t target_satp = ((uintptr_t)SATP_MODE_SV39 << 60) |
++                                (proc->pgdir >> RISCV_PGSHIFT);
++        write_csr(satp, target_satp);
++        flush_tlb();
++        asm volatile ("" ::: "memory");
++        switch_to(&prev->context, &proc->context);
++        local_intr_restore(intr_flag);
++    }
++}
++
++int do_yield(void) {
++    //lab5 function4 2412933
++    assert(current != NULL);
++    current->need_resched = 1;
++    /* trap() schedules after the syscall; injected tests also require this. */
++    return 0;
++}
++
++int do_kill(int pid) {
++    //lab5 function4 2412933
++    bool intr_flag;
++    int result = -E_INVAL;
++    local_intr_save(intr_flag);
++    struct proc_struct *proc = find_proc(pid);
++    if (proc != NULL && proc != idleproc && proc != initproc &&
++        proc->state != PROC_UNINIT && proc->state != PROC_ZOMBIE) {
++        if (proc->flags & PF_EXITING) {
++            result = -E_KILLED;
++        } else {
++            proc->flags |= PF_EXITING;
++            if (proc->state == PROC_SLEEPING &&
++                (proc->wait_state & WT_INTERRUPTED)) {
++                wakeup_proc(proc);
++            }
++            result = 0;
++        }
++    }
++    local_intr_restore(intr_flag);
++    return result;
++}
++/* END LAB5 B */
++
+ 
+ //lab5 function2 YOUR CODE update alloc_proc
+ 
+--- a/kern/process/switch.S
++++ b/kern/process/switch.S
+@@ -1,3 +1,38 @@
+ #include <riscv.h>
+ 
+-//lab4 请补充你在lab4中的代码
++//lab4 dependency adapted for Lab5 2412933
++.text
++.balign 4
++.globl switch_to
++.type switch_to, @function
++switch_to:
++    STORE ra, 0*REGBYTES(a0)
++    STORE sp, 1*REGBYTES(a0)
++    STORE s0, 2*REGBYTES(a0)
++    STORE s1, 3*REGBYTES(a0)
++    STORE s2, 4*REGBYTES(a0)
++    STORE s3, 5*REGBYTES(a0)
++    STORE s4, 6*REGBYTES(a0)
++    STORE s5, 7*REGBYTES(a0)
++    STORE s6, 8*REGBYTES(a0)
++    STORE s7, 9*REGBYTES(a0)
++    STORE s8, 10*REGBYTES(a0)
++    STORE s9, 11*REGBYTES(a0)
++    STORE s10, 12*REGBYTES(a0)
++    STORE s11, 13*REGBYTES(a0)
++    LOAD ra, 0*REGBYTES(a1)
++    LOAD sp, 1*REGBYTES(a1)
++    LOAD s0, 2*REGBYTES(a1)
++    LOAD s1, 3*REGBYTES(a1)
++    LOAD s2, 4*REGBYTES(a1)
++    LOAD s3, 5*REGBYTES(a1)
++    LOAD s4, 6*REGBYTES(a1)
++    LOAD s5, 7*REGBYTES(a1)
++    LOAD s6, 8*REGBYTES(a1)
++    LOAD s7, 9*REGBYTES(a1)
++    LOAD s8, 10*REGBYTES(a1)
++    LOAD s9, 11*REGBYTES(a1)
++    LOAD s10, 12*REGBYTES(a1)
++    LOAD s11, 13*REGBYTES(a1)
++    ret
++.size switch_to, .-switch_to
+--- a/kern/schedule/sched.c
++++ b/kern/schedule/sched.c
+@@ -23,4 +23,30 @@
+     local_intr_restore(intr_flag);
+ }
+ 
+-//lab4 请补充你在lab4中的代码
++//lab4 dependency adapted for Lab5 2412933
++void schedule(void)
++{
++    bool intr_flag;
++    local_intr_save(intr_flag);
++    assert(current != NULL && idleproc != NULL);
++    current->need_resched = 0;
++    list_entry_t *last = current == idleproc ? &proc_list : &current->list_link;
++    list_entry_t *le = last;
++    struct proc_struct *next = NULL;
++    do {
++        le = list_next(le);
++        if (le != &proc_list) {
++            struct proc_struct *candidate = le2proc(le, list_link);
++            if (candidate->state == PROC_RUNNABLE) {
++                next = candidate;
++                break;
++            }
++        }
++    } while (le != last);
++    if (next == NULL) {
++        next = idleproc;
++    }
++    next->runs++;
++    proc_run(next);
++    local_intr_restore(intr_flag);
++}
+--- a/kern/syscall/syscall.c
++++ b/kern/syscall/syscall.c
+@@ -4,21 +4,94 @@
+ #include <trap.h>
+ #include <stdio.h>
+ #include <pmm.h>
++#include <vmm.h>
++#include <error.h>
+ #include <assert.h>
+ 
++//lab5 function1 2412933
++static int sys_exit(uint64_t arg[]) {
++    return do_exit((int)arg[0]);
++}
+ 
+-static int (*syscalls[])(uint64_t arg[]) = {
+-    [SYS_exit]              sys_exit,
+-    [SYS_fork]              sys_fork,
+-    [SYS_wait]              sys_wait,
+-    [SYS_exec]              sys_exec,
+-    [SYS_yield]             sys_yield,
+-    [SYS_kill]              sys_kill,
+-    [SYS_getpid]            sys_getpid,
+-    [SYS_putc]              sys_putc,
+-    [SYS_pgdir]             sys_pgdir,
++static int sys_fork(uint64_t arg[]) {
++    return do_fork(0, current->tf->gpr.sp, current->tf);
++}
++
++/* Reject wrapping ranges before the framework's VMA permission check. */
++static bool syscall_user_range(uintptr_t addr, size_t len, bool write) {
++    return current->mm != NULL && len != 0 &&
++           USERBASE <= addr && addr < USERTOP && len <= USERTOP - addr &&
++           user_mem_check(current->mm, addr, len, write);
++}
++
++static int sys_wait(uint64_t arg[]) {
++    int *store = (int *)(uintptr_t)arg[1];
++    if (store != NULL && !syscall_user_range((uintptr_t)store, sizeof(*store), 1)) {
++        return -E_INVAL;
++    }
++    /* A must use the agreed COW-aware user write path when storing the code. */
++    return do_wait((int)arg[0], store);
++}
++
++static int sys_exec(uint64_t arg[]) {
++    const char *name = (const char *)(uintptr_t)arg[0];
++    size_t len = (size_t)arg[1];
++    unsigned char *binary = (unsigned char *)(uintptr_t)arg[2];
++    size_t size = (size_t)arg[3];
++    if (!syscall_user_range((uintptr_t)name, len, 0) ||
++        !syscall_user_range((uintptr_t)binary, size, 0)) {
++        return -E_INVAL;
++    }
++    /* do_execve must stage user-backed inputs before releasing the old mm. */
++    return do_execve(name, len, binary, size);
++}
++
++static int sys_yield(uint64_t arg[]) {
++    return do_yield();
++}
++
++static int sys_kill(uint64_t arg[]) {
++    return do_kill((int)arg[0]);
++}
++
++static int sys_getpid(uint64_t arg[]) {
++    return current->pid;
++}
++
++static int sys_putc(uint64_t arg[]) {
++    cputchar((int)arg[0]);
++    return 0;
++}
++
++static int sys_pgdir(uint64_t arg[]) {
++    print_pgdir();
++    return 0;
++}
++
++static int (*const syscalls[])(uint64_t arg[]) = {
++    [SYS_exit] = sys_exit,
++    [SYS_fork] = sys_fork,
++    [SYS_wait] = sys_wait,
++    [SYS_exec] = sys_exec,
++    [SYS_yield] = sys_yield,
++    [SYS_kill] = sys_kill,
++    [SYS_getpid] = sys_getpid,
++    [SYS_putc] = sys_putc,
++    [SYS_pgdir] = sys_pgdir,
+ };
+ 
+-#define NUM_SYSCALLS        ((sizeof(syscalls)) / (sizeof(syscalls[0])))
++#define NUM_SYSCALLS (sizeof(syscalls) / sizeof(syscalls[0]))
+ 
+-//lab5 function1 YOUR CODE
++void syscall(void) {
++    assert(current != NULL && current->tf != NULL);
++    struct trapframe *tf = current->tf;
++    uint64_t number = tf->gpr.a0;
++    int result = -E_INVAL;
++    if (number < NUM_SYSCALLS && syscalls[number] != NULL) {
++        uint64_t arg[5] = {
++            tf->gpr.a1, tf->gpr.a2, tf->gpr.a3, tf->gpr.a4, tf->gpr.a5
++        };
++        result = syscalls[number](arg);
++    }
++    tf->gpr.a0 = (uintptr_t)(intptr_t)result;
++}
+--- a/kern/trap/trap.c
++++ b/kern/trap/trap.c
+@@ -15,6 +15,7 @@
+ #include <sched.h>
+ #include <sync.h>
+ #include <sbi.h>
++#include <cow.h>
+ 
+ #define TICK_NUM 100
+ 
+@@ -95,9 +96,67 @@
+ 
+ extern struct mm_struct *check_mm_struct;
+ 
+-//lab3 请补充你在lab3中的代码
+-
+-//lab5 function1 YOUR CODE update exception_handler
++//lab3 dependency adapted for Lab5 2412933
++static void interrupt_handler(struct trapframe *tf)
++{
++    uintptr_t cause = tf->cause & ~((uintptr_t)1 << 63);
++    switch (cause) {
++    case IRQ_S_TIMER:
++        clock_set_next_event();
++        ticks++;
++        /* Lab5 spin/waitkill need a running user loop to relinquish the CPU.
++         * trap() performs the switch only on the return-to-user boundary.
++         */
++        if (current != NULL) {
++            current->need_resched = 1;
++        }
++        if (ticks % TICK_NUM == 0) {
++            print_ticks();
++        }
++        break;
++    case IRQ_S_SOFT:
++        clear_csr(sip, MIP_SSIP);
++        break;
++    default:
++        print_trapframe(tf);
++        break;
++    }
++}
++
++//lab5 function1 2412933 update exception_handler
++/* Global linkage is required by tools/test_lab5.c's injected syscall test. */
++void exception_handler(struct trapframe *tf)
++{
++    switch (tf->cause) {
++    case CAUSE_USER_ECALL:
++        /* ECALL is a 32-bit instruction, independent of compressed support. */
++        tf->epc += 4;
++        syscall();
++        return;
++    case CAUSE_STORE_PAGE_FAULT:
++        if (current != NULL && current->mm != NULL) {
++            int result = cow_resolve_write(current->mm, tf->tval);
++            if (result == 0) {
++                /* Retry the same store, including a legitimate kernel copy. */
++                return;
++            }
++            if (result == -E_NO_MEM) {
++                do_exit(-E_NO_MEM);
++                panic("do_exit returned after a COW allocation failure");
++            }
++        }
++        break;
++    default:
++        break;
++    }
++    print_trapframe(tf);
++    if (!trap_in_kernel(tf) && current != NULL) {
++        do_exit(-E_KILLED);
++        panic("do_exit returned after a fatal user exception");
++    }
++    /* Boot uses the explicit __trapret path. No implicit EBREAK-as-exec ABI. */
++    panic("unhandled kernel exception");
++}
+ 
+ 
+ static inline void trap_dispatch(struct trapframe *tf)
+--- a/kern/trap/trapentry.S
++++ b/kern/trap/trapentry.S
+@@ -66,21 +66,73 @@
+     .endm
+ 
+     .macro RESTORE_ALL
+-
+-    #lab3：填写你在lab3中实现的代码，并进行修改补充
++    LOCAL _restore_kernel_return
++    LOCAL _restore_integer_registers
++    #lab3 dependency / lab5 B 2412933: restore both U and S return paths
++    LOAD s1, 32*REGBYTES(sp)
++    LOAD s2, 33*REGBYTES(sp)
++    andi s0, s1, SSTATUS_SPP
++    bnez s0, _restore_kernel_return
++    # Returning to U: remember the unwound kernel stack for its next trap.
++    addi s0, sp, 36*REGBYTES
++    csrw sscratch, s0
++    j _restore_integer_registers
++_restore_kernel_return:
++    # Returning to S: a subsequent S trap must keep its existing kernel stack.
++    csrw sscratch, zero
++_restore_integer_registers:
++    # Keep interrupts masked until SRET restores SIE from SPIE.
++    andi s1, s1, -3
++    csrw sstatus, s1
++    csrw sepc, s2
++    LOAD x1, 1*REGBYTES(sp)
++    LOAD x3, 3*REGBYTES(sp)
++    LOAD x4, 4*REGBYTES(sp)
++    LOAD x5, 5*REGBYTES(sp)
++    LOAD x6, 6*REGBYTES(sp)
++    LOAD x7, 7*REGBYTES(sp)
++    LOAD x8, 8*REGBYTES(sp)
++    LOAD x9, 9*REGBYTES(sp)
++    LOAD x10, 10*REGBYTES(sp)
++    LOAD x11, 11*REGBYTES(sp)
++    LOAD x12, 12*REGBYTES(sp)
++    LOAD x13, 13*REGBYTES(sp)
++    LOAD x14, 14*REGBYTES(sp)
++    LOAD x15, 15*REGBYTES(sp)
++    LOAD x16, 16*REGBYTES(sp)
++    LOAD x17, 17*REGBYTES(sp)
++    LOAD x18, 18*REGBYTES(sp)
++    LOAD x19, 19*REGBYTES(sp)
++    LOAD x20, 20*REGBYTES(sp)
++    LOAD x21, 21*REGBYTES(sp)
++    LOAD x22, 22*REGBYTES(sp)
++    LOAD x23, 23*REGBYTES(sp)
++    LOAD x24, 24*REGBYTES(sp)
++    LOAD x25, 25*REGBYTES(sp)
++    LOAD x26, 26*REGBYTES(sp)
++    LOAD x27, 27*REGBYTES(sp)
++    LOAD x28, 28*REGBYTES(sp)
++    LOAD x29, 29*REGBYTES(sp)
++    LOAD x30, 30*REGBYTES(sp)
++    LOAD x31, 31*REGBYTES(sp)
++    LOAD x2, 2*REGBYTES(sp)
+     .endm
+ 
+     .globl __alltraps
+ __alltraps:
+     SAVE_ALL
+ 
+-    #lab3:填写你在lab3中实现的代码
++    #lab3 dependency / lab5 B 2412933
++    mv a0, sp
++    jal trap
+     # sp should be the same as before "jal trap"
+ 
+     .globl __trapret
+ __trapret:
+     RESTORE_ALL
+     # return from supervisor call
++    .globl __lab5_sret
++__lab5_sret:
+     sret
+  
+     .globl forkrets
+--- a/user/libs/syscall.c
++++ b/user/libs/syscall.c
+@@ -1,73 +1,59 @@
+ #include <defs.h>
+ #include <unistd.h>
+-#include <stdarg.h>
+ #include <syscall.h>
+ 
+-#define MAX_ARGS            5
+-
+-static inline int
+-syscall(int64_t num, ...) {
+-    va_list ap;
+-    va_start(ap, num);
+-    uint64_t a[MAX_ARGS];
+-    int i, ret;
+-    for (i = 0; i < MAX_ARGS; i ++) {
+-        a[i] = va_arg(ap, uint64_t);
+-    }
+-    va_end(ap);
+-
+-    asm volatile (
+-        "ld a0, %1\n"
+-        "ld a1, %2\n"
+-        "ld a2, %3\n"
+-        "ld a3, %4\n"
+-        "ld a4, %5\n"
+-    	"ld a5, %6\n"
+-        "ecall\n"
+-        "sd a0, %0"
+-        : "=m" (ret)
+-        : "m"(num), "m"(a[0]), "m"(a[1]), "m"(a[2]), "m"(a[3]), "m"(a[4])
+-        :"memory");
+-    return ret;
++//lab5 function1 user ABI fix 2412933
++/* Fixed-width, fixed-arity inputs avoid reading nonexistent variadic arguments.
++ * The result stays in a register: no 64-bit store into a 32-bit int object.
++ */
++static inline int syscall(uintptr_t number, uintptr_t p0, uintptr_t p1,
++                          uintptr_t p2, uintptr_t p3, uintptr_t p4)
++{
++    register uintptr_t a0 asm("a0") = number;
++    register uintptr_t a1 asm("a1") = p0;
++    register uintptr_t a2 asm("a2") = p1;
++    register uintptr_t a3 asm("a3") = p2;
++    register uintptr_t a4 asm("a4") = p3;
++    register uintptr_t a5 asm("a5") = p4;
++    asm volatile ("ecall"
++                  : "+r"(a0), "+r"(a1), "+r"(a2), "+r"(a3), "+r"(a4), "+r"(a5)
++                  :
++                  : "memory");
++    return (int)(intptr_t)a0;
+ }
+ 
+-int
+-sys_exit(int64_t error_code) {
+-    return syscall(SYS_exit, error_code);
++int sys_exit(int64_t code) {
++    return syscall(SYS_exit, (uintptr_t)code, 0, 0, 0, 0);
+ }
+ 
+-int
+-sys_fork(void) {
+-    return syscall(SYS_fork);
++int sys_fork(void) {
++    return syscall(SYS_fork, 0, 0, 0, 0, 0);
+ }
+ 
+-int
+-sys_wait(int64_t pid, int *store) {
+-    return syscall(SYS_wait, pid, store);
++int sys_wait(int64_t pid, int *store) {
++    return syscall(SYS_wait, (uintptr_t)pid, (uintptr_t)store, 0, 0, 0);
+ }
+ 
+-int
+-sys_yield(void) {
+-    return syscall(SYS_yield);
++int sys_exec(const char *name, size_t len, unsigned char *binary, size_t size) {
++    return syscall(SYS_exec, (uintptr_t)name, len, (uintptr_t)binary, size, 0);
+ }
+ 
+-int
+-sys_kill(int64_t pid) {
+-    return syscall(SYS_kill, pid);
++int sys_yield(void) {
++    return syscall(SYS_yield, 0, 0, 0, 0, 0);
+ }
+ 
+-int
+-sys_getpid(void) {
+-    return syscall(SYS_getpid);
++int sys_kill(int64_t pid) {
++    return syscall(SYS_kill, (uintptr_t)pid, 0, 0, 0, 0);
+ }
+ 
+-int
+-sys_putc(int64_t c) {
+-    return syscall(SYS_putc, c);
++int sys_getpid(void) {
++    return syscall(SYS_getpid, 0, 0, 0, 0, 0);
+ }
+ 
+-int
+-sys_pgdir(void) {
+-    return syscall(SYS_pgdir);
++int sys_putc(int64_t c) {
++    return syscall(SYS_putc, (uintptr_t)c, 0, 0, 0, 0);
+ }
+ 
++int sys_pgdir(void) {
++    return syscall(SYS_pgdir, 0, 0, 0, 0, 0);
++}
+--- a/user/libs/syscall.h
++++ b/user/libs/syscall.h
+@@ -1,14 +1,16 @@
+ #ifndef __USER_LIBS_SYSCALL_H__
+ #define __USER_LIBS_SYSCALL_H__
++
++#include <defs.h>
+ 
+ int sys_exit(int64_t error_code);
+ int sys_fork(void);
+ int sys_wait(int64_t pid, int *store);
++int sys_exec(const char *name, size_t len, unsigned char *binary, size_t size);
+ int sys_yield(void);
+ int sys_kill(int64_t pid);
+ int sys_getpid(void);
+ int sys_putc(int64_t c);
+ int sys_pgdir(void);
+ 
+-#endif /* !__USER_LIBS_SYSCALL_H__ */
+-
++#endif

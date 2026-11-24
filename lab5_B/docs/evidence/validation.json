@@ -1,0 +1,75 @@
+{
+  "scope": "Offline audit of user-supplied WSL evidence; not a new QEMU run",
+  "runtime_checkpoints": [
+    "S_IRQ_STACK",
+    "CONTEXT_SWITCH",
+    "USER_ECALL_ABI",
+    "COW_SHARED_WRITE",
+    "COW_LAST_REFERENCE",
+    "COW_NESTED_KERNEL_STORE",
+    "COW_PREPARED_KERNEL_STORE",
+    "TIMER_PREEMPT_AND_KILL",
+    "READONLY_REJECT",
+    "KERNEL_ACCESS_REJECT",
+    "COW_OOM_PRESERVE"
+  ],
+  "runtime_checkpoints_count": 11,
+  "qemu_final_result": "PASS",
+  "host_complete_session_pid": 915,
+  "host_complete_session_exit": "normal",
+  "guest_user_ecall_pc": "0x8004b2",
+  "guest_user_return_pc": "0x8004b6",
+  "guest_user_sp": "0x1001fd0",
+  "syscall_number": 30,
+  "syscall_argument": 85,
+  "syscall_result": 0,
+  "qemu_entry_priv": 0,
+  "qemu_trap_priv": 1,
+  "qemu_sret_priv_before": 1,
+  "qemu_sret_priv_after": 0,
+  "mstatus_before_sret": "0xa000400a0",
+  "mstatus_after_sret": "0xa000400a2",
+  "screenshots_verified": 8,
+  "B_implementation_unchanged_from_delivery": [
+    "overlay/kern/mm/cow.c",
+    "overlay/kern/mm/cow.h",
+    "overlay/kern/process/switch.S",
+    "overlay/kern/schedule/sched.c",
+    "overlay/kern/syscall/syscall.c",
+    "overlay/kern/trap/trap.c",
+    "overlay/kern/trap/trapentry.S",
+    "overlay/user/libs/syscall.c",
+    "overlay/user/libs/syscall.h",
+    "snippets/proc_B.c"
+  ],
+  "fixture_runtime_sources_unchanged_from_delivery": [
+    "entry.S",
+    "include/fixture_shared.h",
+    "include/pmm.h",
+    "kernel.c",
+    "kernel.ld",
+    "user.S",
+    "user.c",
+    "user.ld"
+  ],
+  "debug_script_regressions": {
+    "B": 4,
+    "fixture": 2
+  },
+  "new_generated_scripts_reexecuted_in_target_GDB": false,
+  "tcg_translation_breakpoints_executed": false,
+  "full_lab5_grade": "not run",
+  "raw_archive_sha256": "30e7f2115f150f64bce3d23474d3d950cabcb1e5003ab5803c5d42ee330308a2",
+  "qemu_source_sha256": {
+    "target/riscv/cpu_helper.c": "891d6e5f276fad7a52dbc0ceab6ffe73414b58d4eadaa36975681fbb9afe3195",
+    "target/riscv/insn_trans/trans_privileged.c.inc": "279b2688dce533a212e326cfb503cf805b8d03a32e621002f90e1c82210af591",
+    "target/riscv/op_helper.c": "828a4bccfe677a8b42d9d8cdb5976274e5dd917424d409d1c29fe186298feeec",
+    "target/riscv/translate.c": "77ac14f18859bec6a6276583434fe066410b12abf1dced04eb24788bba96d841",
+    "accel/tcg/cpu-exec.c": "64e93b89f2020250eac077efccb26ae0648f4ae8982e2c66f16217e94e89aac0"
+  },
+  "raw_log_sha256": {
+    "host.log": "f2c7c4b73271e8be4385bd3fa2b0f8af764f93d7e3e7b3516f0db43d4cd2a2bd",
+    "guest.log": "cd207579c926b812d775d4e28b30c818da9a54859758e451667a42027bae2bff",
+    "qemu.log": "207ad56010a5b699f9993956ce7fc12ab5334d0ff390c9d3156107f7ac4b6f8a"
+  }
+}

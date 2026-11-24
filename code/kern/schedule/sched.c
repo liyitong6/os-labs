@@ -4,23 +4,33 @@
 #include <sched.h>
 #include <assert.h>
 
-void
-wakeup_proc(struct proc_struct *proc) {
-    assert(proc->state != PROC_ZOMBIE && proc->state != PROC_RUNNABLE);
-    proc->state = PROC_RUNNABLE;
+void wakeup_proc(struct proc_struct *proc)
+{
+    assert(proc->state != PROC_ZOMBIE);
+    bool intr_flag;
+    local_intr_save(intr_flag);
+    {
+        if (proc->state != PROC_RUNNABLE)
+        {
+            proc->state = PROC_RUNNABLE;
+            proc->wait_state = 0;
+        }
+        else
+        {
+            warn("wakeup runnable process.\n");
+        }
+    }
+    local_intr_restore(intr_flag);
 }
 
-//LAB4 function3 2412933
-
-void
-schedule(void)
+//lab4 dependency adapted for Lab5 2412933
+void schedule(void)
 {
     bool intr_flag;
     local_intr_save(intr_flag);
     assert(current != NULL && idleproc != NULL);
     current->need_resched = 0;
-    list_entry_t *last = (current == idleproc)
-                      ? &proc_list : &current->list_link;
+    list_entry_t *last = current == idleproc ? &proc_list : &current->list_link;
     list_entry_t *le = last;
     struct proc_struct *next = NULL;
     do {
@@ -40,6 +50,3 @@ schedule(void)
     proc_run(next);
     local_intr_restore(intr_flag);
 }
-
-
-

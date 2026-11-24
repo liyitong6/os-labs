@@ -1,0 +1,53 @@
+{
+  "scope": "User-supplied WSL screenshots; partial B evidence, not full Lab5 grade",
+  "images": [
+    {
+      "file": "screenshots/01_B部分独立运行测试通过.png",
+      "source_attachment": "01-f63107a69dde5a2b073f8cb192e845ff.png",
+      "sha256": "8180037c942706596f4b3da7c302894fe7a14a364a0797182776a7c7ecdc5f85",
+      "size_bytes": 65351
+    },
+    {
+      "file": "screenshots/02_用户态ECALL执行前.png",
+      "source_attachment": "02-35583a4af37cae488b12a7505ed78cf9.png",
+      "sha256": "4d9505c7d4b303d19057c8dca3b077f29f25dc430fcc75ffca5d52ccac1fcbe0",
+      "size_bytes": 29955
+    },
+    {
+      "file": "screenshots/03_QEMU处理用户态ECALL.png",
+      "source_attachment": "01-c2539693-86e7-4e6c-8e4e-63e743d6457f.png",
+      "sha256": "fefbd2cb4b271cf19841ee3196b4e8a1fea9bd2876ba0eb30a8cb76ed807df97",
+      "size_bytes": 62506
+    },
+    {
+      "file": "screenshots/04_QEMU进入S态.png",
+      "source_attachment": "01-cb8cab5d-bf4c-4a1e-ad37-3506565b2353.png",
+      "sha256": "92f498e00f326fb97479b9927112f6c8b1bf38ba13db4df6480e85f67ad7adbc",
+      "size_bytes": 75932
+    },
+    {
+      "file": "screenshots/05_内核系统调用分发.png",
+      "source_attachment": "01-6cdb3f20-a787-4ec0-943a-0164c266d649.png",
+      "sha256": "04d068b06ab591b8f775a1bcc0ee87b7ae39cd4da77dcecd781f47aaffb5ffd3",
+      "size_bytes": 37351
+    },
+    {
+      "file": "screenshots/06_系统调用返回与SRET前状态.png",
+      "source_attachment": "01-75004bdc-ac73-46ac-88fc-b7b393a867a2.png",
+      "sha256": "478570c2217c724b49d57b96aa65e3b8954c17139d5529c38d1186af8473bbd7",
+      "size_bytes": 58343
+    },
+    {
+      "file": "screenshots/07_QEMU执行SRET切回用户态.png",
+      "source_attachment": "01-ec87687f-775c-4a50-abc4-5bf5c180f90e.png",
+      "sha256": "9a4f8260485a3f8f5d12e3a9ebf23a77cab1fe91fae37927d5aad8f00967e540",
+      "size_bytes": 84054
+    },
+    {
+      "file": "screenshots/08_返回用户态.png",
+      "source_attachment": "01-7cdadd61-0c80-4368-8d66-730b072a22a4.png",
+      "sha256": "c50314c9227572cf5119eea30ded9930eb80cc9f4e1dd4ed4c7b3393f9c2b7c5",
+      "size_bytes": 26172
+    }
+  ]
+}

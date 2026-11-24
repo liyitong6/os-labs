@@ -1,0 +1,9 @@
+Scope: host C syntax checks with the actual Lab5 headers and RV64 preprocessor definitions. Not RISC-V code generation.
+Bootstrap fresh-tree workflow: PASS
+Existing destination protection: PASS
+PASS kern/syscall/syscall.c
+PASS kern/trap/trap.c
+PASS kern/schedule/sched.c
+PASS kern/process/proc.c
+PASS kern/mm/cow.c
+PASS user/libs/syscall.c

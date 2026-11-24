@@ -1,0 +1,22 @@
+{
+  "scope": "Lab5 B implementation, integration contract, verified user WSL evidence and QEMU source analysis",
+  "host_assertions": 5434,
+  "scheduler_scenarios": 896,
+  "assembly_semantic_scenarios": 500,
+  "installer_tests": 7,
+  "debug_preparation_tests": 4,
+  "host_syntax_translation_units": 6,
+  "asan_ubsan": "passed; leak detection disabled due environment",
+  "riscv_target_compile": "passed: user WSL Ubuntu-22.04; 8 B translation units; output supplied in this conversation",
+  "qemu_runtime": "passed: 11 independent B runtime checkpoints on user QEMU 7.0.0; A/C fixture substitutes; screenshot in docs/evidence/screenshots",
+  "dual_gdb_live_session": "completed user WSL SYS_putc U/S/U runtime trace; 8 screenshots and original logs archived; corresponding QEMU 7.0.0 source/TCG analysis completed",
+  "full_grade": "pending",
+  "student_id": "2412933",
+  "framework_sha256": "4dd863d539fc70eb6df24eaab2b45cda7cbf9c7d47817fbee20bda4926b42ae2",
+  "fixture_debug_preparation_tests": 2,
+  "tcg_translation_breakpoints": "not executed; translation discussion is based on supplied source and runtime helper evidence",
+  "repository_write": "pending on user WSL; no local repository commit or push performed",
+  "evidence": "docs/evidence/README.md",
+  "source_analysis": "docs/GDB_OBSERVATIONS.md",
+  "implementation_changed_in_this_update": false
+}

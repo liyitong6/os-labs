@@ -1,0 +1,20 @@
+B debug preparation
+test_guest_script_uses_native_commands_and_paths_with_spaces (__main__.DebugPrepareTests.test_guest_script_uses_native_commands_and_paths_with_spaces) ... ok
+test_local_source_candidates_are_version_local (__main__.DebugPrepareTests.test_local_source_candidates_are_version_local) ... ok
+test_reads_text_instead_of_entry (__main__.DebugPrepareTests.test_reads_text_instead_of_entry) ... ok
+test_rejects_non_elf64 (__main__.DebugPrepareTests.test_rejects_non_elf64) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.066s
+
+OK
+
+fixture debug preparation
+test_native_guest_script_with_space_in_path (__main__.FixtureDebugTests.test_native_guest_script_with_space_in_path) ... ok
+test_rejects_an_unexpected_fixture_entry (__main__.FixtureDebugTests.test_rejects_an_unexpected_fixture_entry) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.003s
+
+OK
+

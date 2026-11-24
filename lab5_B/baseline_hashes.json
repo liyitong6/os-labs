@@ -1,0 +1,11 @@
+{
+  "user/libs/syscall.c": "915897f788ec81335358215f673cb32f5d6f1d5773502453606ab766b1037c6d",
+  "user/libs/syscall.h": "8301272e0699fe6d71a4b451cece8315e4e4dcf3e72ade82c4264df20c1d8cba",
+  "kern/trap/trap.c": "20d96c6e5089c644261e7d2463d0a69fc164048ee6e3cc3eebad33d2dfae0226",
+  "kern/trap/trapentry.S": "416c28b0a839bce542d3569f53ef108a633adc861845b2816f69ca153cc7d92a",
+  "kern/schedule/sched.c": "8985e7420329abf9afdb822624081e595ed5c8c84bc6cce9a7abad7080e41dd7",
+  "kern/mm/cow.c": null,
+  "kern/mm/cow.h": null,
+  "kern/syscall/syscall.c": "328f678e25659c4ad6790f46ecf63c8c3ac413d931db792c6eacc65a5c61661e",
+  "kern/process/switch.S": "d13a4aad49785f01a5140a696ecedc307832bc3cd78305f50d74c3a7b3aed5fa"
+}

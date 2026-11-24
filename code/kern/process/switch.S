@@ -1,5 +1,6 @@
-//LAB4 function3 2412933
 #include <riscv.h>
+
+//lab4 dependency adapted for Lab5 2412933
 .text
 .balign 4
 .globl switch_to

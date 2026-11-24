@@ -6,3 +6,15 @@
 /code/.gdb.in
 
 /code/.qemu.out
+
+# Lab5 generated outputs
+/code/B_build_check/
+/code/bin/
+/code/obj/
+/code/build/
+/code/lab5_B_backups/
+/lab5_B/tests/build/
+/lab5_B_qemu_checks/build/
+__pycache__/
+*.pyc
+*.o

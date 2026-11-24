@@ -1,0 +1,29 @@
+PASS syscall dispatch, ABI forwarding, pointer bounds and injected ECALL behavior
+PASS yield/kill lifecycle flags, protected processes, interruptible wakeup and interrupt state
+PASS 896 scheduler scenarios (runnable sets, current thread and interrupt state)
+PASS COW isolation, last-reference path, permissions, rollback and cross-page user writes
+PASS nested trap frame restoration, user/kernel fault policy, COW retry, timer and software IRQ
+PASS 5434 assertions against real B C sources with mocked platform/backends
+PASS 400 actual-assembly U/S, nested-trap and interrupt-state semantic scenarios
+PASS 100 actual-assembly context save/restore scenarios (14 x 8 bytes)
+Scope: source-instruction semantic model; not native RISC-V execution.
+test_ac_regions_and_grading_preserved (__main__.InstallerTests.test_ac_regions_and_grading_preserved) ... ok
+test_apply_and_idempotence (__main__.InstallerTests.test_apply_and_idempotence) ... ok
+test_backup_matches_previous_bytes (__main__.InstallerTests.test_backup_matches_previous_bytes) ... ok
+test_custom_file_conflict_changes_nothing (__main__.InstallerTests.test_custom_file_conflict_changes_nothing) ... ok
+test_existing_b_functions_replace_without_duplicates (__main__.InstallerTests.test_existing_b_functions_replace_without_duplicates) ... ok
+test_preview_is_read_only (__main__.InstallerTests.test_preview_is_read_only) ... ok
+test_student_id_is_scoped_to_b (__main__.InstallerTests.test_student_id_is_scoped_to_b) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.147s
+
+OK
+test_local_source_candidates_are_version_local (__main__.DebugPrepareTests.test_local_source_candidates_are_version_local) ... ok
+test_reads_text_instead_of_entry (__main__.DebugPrepareTests.test_reads_text_instead_of_entry) ... ok
+test_rejects_non_elf64 (__main__.DebugPrepareTests.test_rejects_non_elf64) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.002s
+
+OK
